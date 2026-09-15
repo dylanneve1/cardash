@@ -53,6 +53,7 @@ public class AppListActivity extends Activity {
 
         TextView title = new TextView(this);
         title.setText(picking ? R.string.pick_app : R.string.all_apps);
+        title.setTypeface(Fonts.display(this));
         title.setTextColor(m3.onSurface());
         title.setTextSize(26);
         title.setPadding(dp(8), 0, 0, dp(16));
@@ -104,6 +105,7 @@ public class AppListActivity extends Activity {
 
         TextView label = new TextView(this);
         label.setText(e.label);
+        label.setTypeface(Fonts.body(this));
         label.setTextColor(m3.onSurface());
         label.setTextSize(14);
         label.setMaxLines(1);

@@ -1,52 +1,55 @@
 package ie.claudius.cardash;
 
+import android.content.Context;
 import android.graphics.Typeface;
+import android.util.Log;
 
 /**
- * Typeface selection.
+ * Typefaces.
  *
- * Google Sans Text is proprietary and cannot be bundled, so this asks
- * the platform for it by family name and falls back cleanly. Pixels and
- * some OEM ROMs ship it; a Chinese head unit almost certainly does not,
- * in which case Roboto is what Material specifies anyway.
+ * Google Sans went open source under the SIL OFL 1.1, so Google Sans
+ * Text ships in the APK rather than being hopefully requested from the
+ * platform. The full family is 2.2 MB per weight covering 8,211 glyphs;
+ * these are subset to Latin, Latin-1 and Latin Extended-A plus common
+ * punctuation and symbols, which is 47 KB per weight and everything a
+ * car launcher will ever render.
  *
- * Typeface.create() never fails — an unknown family silently returns
- * the default — so the fallback chain costs nothing and the UI simply
- * looks slightly better on devices that happen to have the font.
+ * Loading still falls back to Roboto if an asset is missing, because a
+ * launcher that crashes at boot leaves the head unit with no home
+ * screen at all.
  */
 public final class Fonts {
 
-    private static final String[] PREFERRED = {
-            "google-sans-text",
-            "google-sans",
-            "product-sans",
-            "sans-serif-medium",
-    };
+    private static final String TAG = "CarDash";
 
     private static Typeface display;
     private static Typeface body;
 
     private Fonts() {}
 
-    /** Large surfaces: the clock, hero labels. */
-    public static Typeface display() {
-        if (display == null) display = pick(Typeface.NORMAL);
+    /** Medium weight — the clock and tile labels. */
+    public static Typeface display(Context ctx) {
+        if (display == null) {
+            display = load(ctx, "fonts/GoogleSansText-Medium.ttf",
+                    "sans-serif-medium");
+        }
         return display;
     }
 
-    /** Everything else. */
-    public static Typeface body() {
-        if (body == null) body = Typeface.create("sans-serif", Typeface.NORMAL);
+    /** Regular weight — everything else. */
+    public static Typeface body(Context ctx) {
+        if (body == null) {
+            body = load(ctx, "fonts/GoogleSansText-Regular.ttf", "sans-serif");
+        }
         return body;
     }
 
-    private static Typeface pick(int style) {
-        for (String family : PREFERRED) {
-            Typeface t = Typeface.create(family, style);
-            // A missing family resolves to the default; only accept a
-            // result that is actually distinct from it.
-            if (t != null && !t.equals(Typeface.DEFAULT)) return t;
+    private static Typeface load(Context ctx, String asset, String fallback) {
+        try {
+            return Typeface.createFromAsset(ctx.getAssets(), asset);
+        } catch (Exception e) {
+            Log.w(TAG, "font " + asset + " missing, falling back: " + e);
+            return Typeface.create(fallback, Typeface.NORMAL);
         }
-        return Typeface.create("sans-serif-medium", style);
     }
 }

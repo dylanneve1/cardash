@@ -169,11 +169,12 @@ public class HomeActivity extends Activity {
         clock.setTextColor(m3.primary());
         clock.setTextSize(72);
         // Expressive leans on weight contrast rather than decoration.
-        clock.setTypeface(Fonts.display());
+        clock.setTypeface(Fonts.display(this));
         clock.setLetterSpacing(-0.03f);
         panel.addView(clock);
 
         date = new TextView(this);
+        date.setTypeface(Fonts.body(this));
         date.setTextColor(m3.onSurfaceVariant());
         date.setTextSize(18);
         date.setPadding(0, dp(4), 0, dp(20));
@@ -181,6 +182,7 @@ public class HomeActivity extends Activity {
 
         TextView allApps = new TextView(this);
         allApps.setText(R.string.all_apps);
+        allApps.setTypeface(Fonts.display(this));
         allApps.setTextColor(m3.onPrimaryContainer());
         allApps.setTextSize(18);
         allApps.setGravity(Gravity.CENTER);
@@ -226,6 +228,7 @@ public class HomeActivity extends Activity {
 
         TextView hint = new TextView(this);
         hint.setText(R.string.hint_long_press);
+        hint.setTypeface(Fonts.body(this));
         hint.setTextColor(M3.withAlpha(m3.onSurfaceVariant(), 0x99));
         hint.setTextSize(12);
         hint.setPadding(0, dp(14), 0, 0);
@@ -317,7 +320,7 @@ public class HomeActivity extends Activity {
         TextView label = new TextView(this);
         label.setText(entry != null ? entry.label : getString(R.string.empty_tile));
         label.setTextColor(onFill);
-        label.setTypeface(Fonts.display());
+        label.setTypeface(Fonts.display(this));
         label.setTextSize(hero ? 22 : 15);
         label.setMaxLines(1);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -428,6 +431,7 @@ public class HomeActivity extends Activity {
     private View chip(String text, int fill, int onFill) {
         TextView t = new TextView(this);
         t.setText(text);
+        t.setTypeface(Fonts.body(this));
         t.setTextColor(onFill);
         t.setTextSize(15);
         t.setBackground(Shapes.pill(density, fill, M3.withAlpha(onFill, 0x33)));

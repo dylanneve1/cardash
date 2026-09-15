@@ -1,4 +1,4 @@
 build/
 *.keystore
 *.idsig
-tools/*.ttf
+tools/Roboto-*.ttf

@@ -21,6 +21,7 @@ echo "==> aapt2 link"
 "$BT/aapt2" link \
   -I "$PLATFORM" \
   --manifest "$HERE/AndroidManifest.xml" \
+  -A "$HERE/assets" \
   --java "$OUT/gen" \
   --min-sdk-version 21 \
   --target-sdk-version 30 \

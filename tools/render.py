@@ -20,8 +20,9 @@ ROOT = os.path.dirname(HERE)
 
 W, H = 1280, 720
 DENSITY = 186 / 160.0          # matches `wm density` on the unit
-REG = os.path.join(HERE, "Roboto-Regular.ttf")
-MED = os.path.join(HERE, "Roboto-Medium.ttf")
+# Same faces the APK bundles, so the mockups render in the real type.
+REG = os.path.join(ROOT, "assets/fonts/GoogleSansText-Regular.ttf")
+MED = os.path.join(ROOT, "assets/fonts/GoogleSansText-Medium.ttf")
 
 # Shapes.FAMILY, verbatim.
 # HomeActivity.SPANS, verbatim: {column, row, colSpan, rowSpan}

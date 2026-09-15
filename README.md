@@ -19,6 +19,12 @@ Built for a Jancar/Rockchip RK3326 unit running Android 11 (API 30),
   treatments rather than all being the same rounded box, containers
   rotate through the primary/secondary/tertiary roles, and touch gets a
   spring overshoot instead of a fade.
+- **Google Sans Text, bundled.** Google Sans is SIL OFL 1.1 since late
+  2025, so the real face ships in the APK instead of being hopefully
+  requested from the platform. The full family is 2.2 MB per weight for
+  8,211 glyphs; these are subset to Latin/Latin-1/Latin Extended-A plus
+  punctuation, which is 47 KB per weight. `assets/fonts/OFL.txt` is the
+  licence.
 - **Dark only.** A bright surface reflected in a windscreen at night is
   a safety problem, not a preference.
 - **Offline.** Nothing in it makes a network request.
