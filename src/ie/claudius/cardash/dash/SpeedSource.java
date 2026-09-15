@@ -79,10 +79,23 @@ public final class SpeedSource {
             // 1s / 0m: we want velocity updates, not movement-gated ones.
             lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0,
                     location);
-            Location last = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            if (last != null) {
-                l.onPosition(last.getLatitude(), last.getLongitude());
-                reportedPosition = true;
+            // Position for the weather card can come from anywhere —
+            // a parked car under a roof may never get a GPS fix, but a
+            // stale network or passive fix is still the right city.
+            for (String provider : new String[] {
+                    LocationManager.GPS_PROVIDER,
+                    LocationManager.NETWORK_PROVIDER,
+                    LocationManager.PASSIVE_PROVIDER }) {
+                Location last = null;
+                try {
+                    last = lm.getLastKnownLocation(provider);
+                } catch (Exception ignored) {
+                }
+                if (last != null) {
+                    l.onPosition(last.getLatitude(), last.getLongitude());
+                    reportedPosition = true;
+                    break;
+                }
             }
         } catch (Exception e) {
             Log.w(TAG, "gps unavailable: " + e);

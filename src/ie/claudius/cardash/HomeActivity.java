@@ -109,7 +109,7 @@ public class HomeActivity extends Activity {
                 weather.setLocation(lat, lon);
             }
         });
-        weather.start(new Weather.Listener() {
+        weather.start(this, new Weather.Listener() {
             @Override
             public void onWeather(int tempC, String description, int code) {
                 if (weatherTemp == null) return;

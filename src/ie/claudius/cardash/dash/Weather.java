@@ -1,5 +1,7 @@
 package ie.claudius.cardash.dash;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -33,22 +35,43 @@ public final class Weather {
     }
 
     private final Handler main = new Handler(Looper.getMainLooper());
+    private Context ctx;
     private Listener listener;
     private double lat, lon;
     private boolean haveLocation;
     private Thread worker;
     private volatile boolean running;
 
-    public void start(Listener l) {
+    public void start(Context context, Listener l) {
+        ctx = context.getApplicationContext();
         listener = l;
+
+        // Coordinates from the last run. A head unit that has been
+        // parked in a garage for a week still knows what city it is in.
+        SharedPreferences p = prefs();
+        if (p.contains("lat")) {
+            lat = Double.longBitsToDouble(p.getLong("lat", 0));
+            lon = Double.longBitsToDouble(p.getLong("lon", 0));
+            haveLocation = true;
+        }
+        kick();
+    }
+
+    private SharedPreferences prefs() {
+        return ctx.getSharedPreferences("cardash", Context.MODE_PRIVATE);
     }
 
     public void setLocation(double latitude, double longitude) {
         lat = latitude;
         lon = longitude;
-        boolean first = !haveLocation;
         haveLocation = true;
-        if (first) kick();
+        if (ctx != null) {
+            prefs().edit()
+                    .putLong("lat", Double.doubleToRawLongBits(lat))
+                    .putLong("lon", Double.doubleToRawLongBits(lon))
+                    .apply();
+        }
+        kick();
     }
 
     public void stop() {
@@ -65,7 +88,11 @@ public final class Weather {
             @Override
             public void run() {
                 while (running) {
-                    fetch();
+                    // No fix and no cache: the unit is online (it just
+                    // fetched nothing) so ask the network where it is.
+                    // Coarse city-level accuracy is plenty for weather.
+                    if (!haveLocation) locateByIp();
+                    if (haveLocation) fetch();
                     try {
                         Thread.sleep(REFRESH_MS);
                     } catch (InterruptedException e) {
@@ -77,6 +104,29 @@ public final class Weather {
         }, "weather");
         worker.setDaemon(true);
         worker.start();
+    }
+
+    private void locateByIp() {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL("https://ipapi.co/json/").openConnection();
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(8000);
+            if (c.getResponseCode() != 200) return;
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            InputStream in = c.getInputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            JSONObject o = new JSONObject(out.toString("UTF-8"));
+            if (o.has("latitude") && o.has("longitude")) {
+                setLocation(o.getDouble("latitude"), o.getDouble("longitude"));
+            }
+        } catch (Exception e) {
+            Log.i(TAG, "ip locate failed: " + e);
+        } finally {
+            if (c != null) c.disconnect();
+        }
     }
 
     private void fetch() {
