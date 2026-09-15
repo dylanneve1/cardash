@@ -171,13 +171,18 @@ public class HomeActivity extends Activity {
         // Expressive leans on weight contrast rather than decoration.
         clock.setTypeface(Fonts.display(this));
         clock.setLetterSpacing(-0.03f);
+        // A 72sp line box carries ~40px of ascender/descender padding
+        // the digits never use, which opened a hole between the clock
+        // and the date on the real panel.
+        clock.setIncludeFontPadding(false);
         panel.addView(clock);
 
         date = new TextView(this);
+        date.setIncludeFontPadding(false);
         date.setTypeface(Fonts.body(this));
         date.setTextColor(m3.onSurfaceVariant());
         date.setTextSize(18);
-        date.setPadding(0, dp(4), 0, dp(20));
+        date.setPadding(0, dp(10), 0, dp(20));
         panel.addView(date);
 
         TextView allApps = new TextView(this);
