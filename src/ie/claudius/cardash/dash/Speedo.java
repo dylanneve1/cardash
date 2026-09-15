@@ -118,7 +118,7 @@ public class Speedo extends View {
         canvas.drawText(text, cx, cy + size * 0.07f, number);
         // Keep the caption inside the ring: the arc's gap is at the
         // bottom and a longer string used to run straight through it.
-        canvas.drawText(hasFix ? "km/h · GPS" : "no GPS fix",
+        canvas.drawText(hasFix ? "km/h" : "no fix",
                 cx, cy + size * 0.20f, unit);
 
         if (shown != kph) postInvalidateOnAnimation();
