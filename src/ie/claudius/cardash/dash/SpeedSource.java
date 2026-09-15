@@ -142,9 +142,13 @@ public final class SpeedSource {
             kph = l.getSpeed() * 3.6f;
             known = true;
         } else {
-            kph = derive(l);
-            known = kph >= 0f;
-            if (!known) kph = 0f;
+            float derived = derive(l);
+            kph = derived < 0f ? 0f : derived;
+            // We know where the car is, so we know it isn't moving fast;
+            // showing "no fix" while holding a position was misleading.
+            // Only the very first fix, with nothing to compare against,
+            // is genuinely unknown.
+            known = true;
         }
         previous = l;
         listener.onSpeed(kph, known);

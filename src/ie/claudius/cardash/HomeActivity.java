@@ -391,7 +391,7 @@ public class HomeActivity extends Activity {
         holder.setBackground(new MaterialShape(
                 MaterialShape.forIndex(slot), M3.withAlpha(onFill, 0x30),
                 slot * 11f));
-        int hp = hero ? dp(18) : dp(11);
+        int hp = hero ? dp(11) : dp(11);
         holder.setPadding(hp, hp, hp, hp);
 
         ImageView icon = new ImageView(this);
@@ -403,7 +403,9 @@ public class HomeActivity extends Activity {
         }
         // The hero is wide now, not tall — a 104dp icon plus a label no
         // longer fits its height and pushed the label out of the tile.
-        int isz = hero ? dp(72) : dp(64);
+        // Row height on a 4-row grid is ~156px; a 72dp icon plus label
+        // plus padding overflowed it and clipped the label.
+        int isz = hero ? dp(54) : dp(64);
         holder.addView(icon, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
