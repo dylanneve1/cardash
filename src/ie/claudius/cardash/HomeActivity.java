@@ -27,6 +27,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+import ie.claudius.cardash.media.NowPlaying;
 import ie.claudius.cardash.vehicle.VehicleHub;
 import ie.claudius.cardash.vehicle.VehicleState;
 
@@ -62,6 +63,10 @@ public class HomeActivity extends Activity {
     private TextView clock, date;
     private LinearLayout vehicleBar;
     private final VehicleHub vehicle = new VehicleHub();
+    private NowPlaying nowPlaying;
+    private ImageView albumArt;
+    private ImageView playButton;
+    private TextView trackTitle, trackArtist;
     private int pendingSlot = -1;
 
     private final BroadcastReceiver timeTick = new BroadcastReceiver() {
@@ -87,6 +92,14 @@ public class HomeActivity extends Activity {
         f.addAction(Intent.ACTION_TIMEZONE_CHANGED);
         registerReceiver(timeTick, f);
         updateClock();
+        if (nowPlaying == null) nowPlaying = new NowPlaying(this);
+        nowPlaying.start(new NowPlaying.Listener() {
+            @Override
+            public void onNowPlaying(String title, String artist,
+                                     android.graphics.Bitmap art, boolean playing) {
+                renderNowPlaying(title, artist, art, playing);
+            }
+        });
         vehicle.start(this, new VehicleState.Listener() {
             @Override
             public void onVehicleState(VehicleState state) {
@@ -106,6 +119,7 @@ public class HomeActivity extends Activity {
             // never registered; harmless
         }
         vehicle.stop();
+        if (nowPlaying != null) nowPlaying.stop();
     }
 
     /** Home is the bottom of the stack — back should do nothing at all. */
@@ -208,19 +222,7 @@ public class HomeActivity extends Activity {
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         panel.addView(allApps, lp);
 
-        // Media transport. dispatchMediaKeyEvent needs no permission and
-        // reaches whatever is actually playing — the vendor music app,
-        // Bluetooth audio, Android Auto — without binding to any of them.
-        LinearLayout media = new LinearLayout(this);
-        media.setOrientation(LinearLayout.HORIZONTAL);
-        media.setPadding(0, dp(18), 0, 0);
-        media.addView(mediaKey(Glyph.Kind.PREV, KeyEvent.KEYCODE_MEDIA_PREVIOUS,
-                m3.surfaceContainerHigh(), m3.onSurface(), false));
-        media.addView(mediaKey(Glyph.Kind.PLAY, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-                m3.primary(), m3.onPrimary(), true));
-        media.addView(mediaKey(Glyph.Kind.NEXT, KeyEvent.KEYCODE_MEDIA_NEXT,
-                m3.surfaceContainerHigh(), m3.onSurface(), false));
-        panel.addView(media);
+        panel.addView(buildNowPlaying());
 
         vehicleBar = new LinearLayout(this);
         vehicleBar.setOrientation(LinearLayout.HORIZONTAL);
@@ -402,35 +404,126 @@ public class HomeActivity extends Activity {
                 vehicleBar.getChildCount() > 0 ? View.VISIBLE : View.GONE);
     }
 
-    /** One circular transport button. */
-    private View mediaKey(Glyph.Kind kind, final int keyCode,
-                          int fill, int onFill, boolean big) {
+    /**
+     * Now playing: art, title, artist, transport.
+     *
+     * Kept in the left column where there was dead space anyway, and
+     * where it is reachable from the driver's seat without leaning.
+     */
+    private View buildNowPlaying() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(Shapes.round(density, m3.surfaceContainerHigh(), 28));
+        int p = dp(14);
+        card.setPadding(p, p, p, p);
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+
+        albumArt = new ImageView(this);
+        albumArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        albumArt.setBackground(new MaterialShape(
+                MaterialShape.Kind.SQUIRCLE, M3.withAlpha(m3.onSurface(), 0x26)));
+        albumArt.setClipToOutline(false);
+        top.addView(albumArt, new LinearLayout.LayoutParams(dp(64), dp(64)));
+
+        LinearLayout text = new LinearLayout(this);
+        text.setOrientation(LinearLayout.VERTICAL);
+        text.setPadding(dp(12), 0, 0, 0);
+
+        trackTitle = new TextView(this);
+        trackTitle.setTypeface(Fonts.display(this));
+        trackTitle.setTextColor(m3.onSurface());
+        trackTitle.setTextSize(17);
+        trackTitle.setMaxLines(1);
+        trackTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        text.addView(trackTitle);
+
+        trackArtist = new TextView(this);
+        trackArtist.setTypeface(Fonts.body(this));
+        trackArtist.setTextColor(m3.onSurfaceVariant());
+        trackArtist.setTextSize(14);
+        trackArtist.setMaxLines(1);
+        trackArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        text.addView(trackArtist);
+
+        top.addView(text, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        card.addView(top);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        row.setPadding(0, dp(12), 0, 0);
+        row.addView(transport(Glyph.Kind.PREV, 0, false));
+        playButton = (ImageView) transport(Glyph.Kind.PLAY, 1, true);
+        row.addView(playButton);
+        row.addView(transport(Glyph.Kind.NEXT, 2, false));
+        card.addView(row);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(18);
+        card.setLayoutParams(lp);
+        return card;
+    }
+
+    private View transport(Glyph.Kind kind, final int action, boolean big) {
         ImageView b = new ImageView(this);
-        b.setImageDrawable(new Glyph(kind, onFill));
-        b.setBackground(Shapes.pill(density, fill, M3.withAlpha(onFill, 0x40)));
+        int fill = big ? m3.primary() : m3.surfaceContainer();
+        int on = big ? m3.onPrimary() : m3.onSurface();
+        b.setImageDrawable(new Glyph(kind, on));
+        b.setBackground(Shapes.pill(density, fill, M3.withAlpha(on, 0x40)));
         b.setClickable(true);
         Shapes.springy(b);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendMediaKey(keyCode);
+                if (nowPlaying == null) return;
+                if (action == 0) nowPlaying.previous();
+                else if (action == 1) nowPlaying.playPause();
+                else nowPlaying.next();
+                // The session reports back asynchronously; nudge it so
+                // the button flips even on a player that is slow to
+                // publish its new state.
+                v.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        nowPlaying.refresh();
+                    }
+                }, 350);
             }
         });
-        int size = big ? dp(64) : dp(52);
+        int size = big ? dp(60) : dp(48);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
-        lp.rightMargin = dp(10);
-        lp.gravity = Gravity.CENTER_VERTICAL;
+        lp.leftMargin = dp(6);
+        lp.rightMargin = dp(6);
         b.setLayoutParams(lp);
-        int p = big ? dp(18) : dp(15);
-        b.setPadding(p, p, p, p);
+        int pad = big ? dp(17) : dp(14);
+        b.setPadding(pad, pad, pad, pad);
         return b;
     }
 
-    private void sendMediaKey(int keyCode) {
-        AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
-        if (am == null) return;
-        am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyCode));
-        am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyCode));
+    private void renderNowPlaying(String title, String artist,
+                                  android.graphics.Bitmap art, boolean playing) {
+        if (trackTitle == null) return;
+        boolean known = title != null && !title.trim().isEmpty();
+        trackTitle.setText(known ? title : getString(R.string.nothing_playing));
+        trackArtist.setText(artist == null ? "" : artist);
+        trackArtist.setVisibility(
+                artist == null || artist.isEmpty() ? View.GONE : View.VISIBLE);
+
+        if (art != null) {
+            albumArt.setImageBitmap(art);
+        } else {
+            albumArt.setImageDrawable(null);
+        }
+        if (playButton != null) {
+            playButton.setImageDrawable(new Glyph(
+                    playing ? Glyph.Kind.PAUSE : Glyph.Kind.PLAY, m3.onPrimary()));
+        }
     }
 
     private View chip(String text, int fill, int onFill) {

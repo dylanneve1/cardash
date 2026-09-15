@@ -5,4 +5,5 @@
     <string name="pick_app">Pick an app for this tile</string>
     <string name="empty_tile">Add</string>
     <string name="hint_long_press">Long-press a tile to change it</string>
+    <string name="nothing_playing">Nothing playing</string>
 </resources>

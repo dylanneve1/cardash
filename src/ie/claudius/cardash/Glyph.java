@@ -17,7 +17,7 @@ import android.graphics.drawable.Drawable;
  */
 public final class Glyph extends Drawable {
 
-    public enum Kind { PREV, PLAY, NEXT }
+    public enum Kind { PREV, PLAY, PAUSE, NEXT }
 
     private final Kind kind;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -48,6 +48,13 @@ public final class Glyph extends Drawable {
                 path.lineTo(cx + s * 0.78f, cy);
                 path.lineTo(cx - s * 0.42f, cy + s);
                 path.close();
+                break;
+            case PAUSE:
+                float bw = s * 0.30f;
+                canvas.drawRect(cx - s * 0.62f, cy - s, cx - s * 0.62f + bw,
+                        cy + s, paint);
+                canvas.drawRect(cx + s * 0.62f - bw, cy - s, cx + s * 0.62f,
+                        cy + s, paint);
                 break;
             case PREV:
                 triangle(cx + s * 0.9f, cy, -s, s);
