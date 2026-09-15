@@ -159,6 +159,11 @@ public final class NowPlaying {
                 }
                 art = m.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
                 if (art == null) art = m.getBitmap(MediaMetadata.METADATA_KEY_ART);
+                // Video players (YouTube) publish a thumbnail here
+                // rather than as album art.
+                if (art == null) {
+                    art = m.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
+                }
             }
             PlaybackState s = controller.getPlaybackState();
             playing = s != null && s.getState() == PlaybackState.STATE_PLAYING;
