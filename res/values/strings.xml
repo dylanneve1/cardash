@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CarDash</string>
+    <string name="all_apps">All apps</string>
+    <string name="pick_app">Pick an app for this tile</string>
+    <string name="empty_tile">Add</string>
+    <string name="hint_long_press">Long-press a tile to change it</string>
+</resources>
