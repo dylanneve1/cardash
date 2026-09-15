@@ -3,6 +3,8 @@ package ie.claudius.cardash;
 import android.app.Activity;
 import android.app.WallpaperManager;
 import android.app.WallpaperColors;
+import android.media.AudioManager;
+import android.view.KeyEvent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -33,7 +35,24 @@ import ie.claudius.cardash.vehicle.VehicleState;
 public class HomeActivity extends Activity {
 
     private static final int REQ_PICK = 1;
-    private static final int COLUMNS = 4;
+    private static final int COLUMNS = 6;
+    private static final int ROWS = 3;
+
+    /**
+     * The mosaic: {column, row, colSpan, rowSpan} per tile.
+     *
+     * Material 3 Expressive varies container SIZE, not just corner
+     * radius — a grid of identical squares is the thing it exists to
+     * get away from. The 2x2 hero is also the one you want to hit
+     * without looking, so the biggest target is the most-used app.
+     */
+    private static final int[][] SPANS = {
+            { 0, 0, 2, 2 },
+            { 2, 0, 2, 1 }, { 4, 0, 2, 1 },
+            { 2, 1, 1, 1 }, { 3, 1, 1, 1 }, { 4, 1, 2, 1 },
+            { 0, 2, 1, 1 }, { 1, 2, 1, 1 }, { 2, 2, 1, 1 },
+            { 3, 2, 1, 1 }, { 4, 2, 1, 1 }, { 5, 2, 1, 1 },
+    };
     /** Used when the wallpaper has no extractable colour (solid black, etc). */
     private static final int FALLBACK_SEED = 0xFF4F7BD5;
 
@@ -182,6 +201,20 @@ public class HomeActivity extends Activity {
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         panel.addView(allApps, lp);
 
+        // Media transport. dispatchMediaKeyEvent needs no permission and
+        // reaches whatever is actually playing — the vendor music app,
+        // Bluetooth audio, Android Auto — without binding to any of them.
+        LinearLayout media = new LinearLayout(this);
+        media.setOrientation(LinearLayout.HORIZONTAL);
+        media.setPadding(0, dp(18), 0, 0);
+        media.addView(mediaKey(Glyph.Kind.PREV, KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                m3.surfaceContainerHigh(), m3.onSurface(), false));
+        media.addView(mediaKey(Glyph.Kind.PLAY, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                m3.primary(), m3.onPrimary(), true));
+        media.addView(mediaKey(Glyph.Kind.NEXT, KeyEvent.KEYCODE_MEDIA_NEXT,
+                m3.surfaceContainerHigh(), m3.onSurface(), false));
+        panel.addView(media);
+
         vehicleBar = new LinearLayout(this);
         vehicleBar.setOrientation(LinearLayout.HORIZONTAL);
         vehicleBar.setPadding(0, dp(16), 0, 0);
@@ -204,16 +237,19 @@ public class HomeActivity extends Activity {
     private View buildGrid() {
         GridLayout grid = new GridLayout(this);
         grid.setColumnCount(COLUMNS);
-        grid.setRowCount((Apps.TILES + COLUMNS - 1) / COLUMNS);
+        grid.setRowCount(ROWS);
 
-        for (int i = 0; i < Apps.TILES; i++) {
-            View tile = buildTile(i);
+        for (int i = 0; i < Apps.TILES && i < SPANS.length; i++) {
+            int[] sp = SPANS[i];
+            boolean hero = sp[2] > 1 && sp[3] > 1;
+            View tile = buildTile(i, hero);
+
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
             lp.width = 0;
             lp.height = 0;
-            lp.columnSpec = GridLayout.spec(i % COLUMNS, 1f);
-            lp.rowSpec = GridLayout.spec(i / COLUMNS, 1f);
-            int g = dp(8);
+            lp.columnSpec = GridLayout.spec(sp[0], sp[2], 1f);
+            lp.rowSpec = GridLayout.spec(sp[1], sp[3], 1f);
+            int g = dp(7);
             lp.setMargins(g, g, g, g);
             grid.addView(tile, lp);
 
@@ -223,15 +259,15 @@ public class HomeActivity extends Activity {
             tile.setTranslationY(dp(24));
             tile.animate()
                     .alpha(1f).translationY(0f)
-                    .setStartDelay(40L * i)
-                    .setDuration(320)
+                    .setStartDelay(35L * i)
+                    .setDuration(340)
                     .setInterpolator(new DecelerateInterpolator(2f))
                     .start();
         }
         return grid;
     }
 
-    private View buildTile(final int slot) {
+    private View buildTile(final int slot, boolean hero) {
         final String pkg = Apps.tile(this, slot);
         Apps.Entry entry = Apps.byPackage(this, pkg);
 
@@ -262,14 +298,14 @@ public class HomeActivity extends Activity {
             icon.setImageResource(android.R.drawable.ic_input_add);
             icon.setColorFilter(onFill);
         }
-        LinearLayout.LayoutParams ip =
-                new LinearLayout.LayoutParams(dp(52), dp(52));
+        int isz = hero ? dp(84) : dp(48);
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(isz, isz);
         tile.addView(icon, ip);
 
         TextView label = new TextView(this);
         label.setText(entry != null ? entry.label : getString(R.string.empty_tile));
         label.setTextColor(onFill);
-        label.setTextSize(15);
+        label.setTextSize(hero ? 22 : 15);
         label.setMaxLines(1);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         label.setGravity(Gravity.CENTER);
@@ -343,6 +379,37 @@ public class HomeActivity extends Activity {
 
         vehicleBar.setVisibility(
                 vehicleBar.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /** One circular transport button. */
+    private View mediaKey(Glyph.Kind kind, final int keyCode,
+                          int fill, int onFill, boolean big) {
+        ImageView b = new ImageView(this);
+        b.setImageDrawable(new Glyph(kind, onFill));
+        b.setBackground(Shapes.pill(density, fill, M3.withAlpha(onFill, 0x40)));
+        b.setClickable(true);
+        Shapes.springy(b);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sendMediaKey(keyCode);
+            }
+        });
+        int size = big ? dp(64) : dp(52);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+        lp.rightMargin = dp(10);
+        lp.gravity = Gravity.CENTER_VERTICAL;
+        b.setLayoutParams(lp);
+        int p = big ? dp(18) : dp(15);
+        b.setPadding(p, p, p, p);
+        return b;
+    }
+
+    private void sendMediaKey(int keyCode) {
+        AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (am == null) return;
+        am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyCode));
+        am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyCode));
     }
 
     private View chip(String text, int fill, int onFill) {

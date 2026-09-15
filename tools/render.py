@@ -23,6 +23,15 @@ REG = os.path.join(HERE, "Roboto-Regular.ttf")
 MED = os.path.join(HERE, "Roboto-Medium.ttf")
 
 # Shapes.FAMILY, verbatim.
+# HomeActivity.SPANS, verbatim: {column, row, colSpan, rowSpan}
+SPANS = [
+    (0, 0, 2, 2),
+    (2, 0, 2, 1), (4, 0, 2, 1),
+    (2, 1, 1, 1), (3, 1, 1, 1), (4, 1, 2, 1),
+    (0, 2, 1, 1), (1, 2, 1, 1), (2, 2, 1, 1),
+    (3, 2, 1, 1), (4, 2, 1, 1), (5, 2, 1, 1),
+]
+
 FAMILY = [
     (28, 28, 28, 28),
     (36, 12, 36, 12),
@@ -120,10 +129,12 @@ def text_w(draw, s, f):
 
 def icon(draw, box, fill, letter, on):
     rounded(draw, box, (14, 14, 14, 14), fill)
-    f = font(MED, int((box[3] - box[1]) * 0.5))
-    w = text_w(draw, letter, f)
-    draw.text((box[0] + ((box[2] - box[0]) - w) / 2,
-               box[1] + (box[3] - box[1]) * 0.22), letter, font=f, fill=on)
+    size = box[3] - box[1]
+    f = font(MED, int(size * 0.5))
+    bb = draw.textbbox((0, 0), letter, font=f)
+    draw.text((box[0] + (size - (bb[2] - bb[0])) / 2 - bb[0],
+               box[1] + (size - (bb[3] - bb[1])) / 2 - bb[1]),
+              letter, font=f, fill=on)
 
 
 def home(seed, apps, chips, path):
@@ -146,6 +157,7 @@ def home(seed, apps, chips, path):
     # The panel uses Gravity.CENTER_VERTICAL, so measure first.
     block = (int(sp(72) * 1.18) + dp(4) + int(sp(18) * 1.3) + dp(20)
              + int(sp(18) * 1.3) + 2 * dp(14)
+             + dp(18) + dp(64)
              + (dp(16) + int(sp(15) * 1.3) + 2 * dp(8) if chips else 0)
              + dp(14) + int(sp(12) * 1.3))
     y = ly0 + ((ly1 - ly0) - block) // 2
@@ -167,6 +179,35 @@ def home(seed, apps, chips, path):
     pill(d, (cx, y, cx + tw + 2 * dp(28), y + ph), p["primaryContainer"])
     d.text((cx + dp(28), y + dp(14)), label, font=f_pill, fill=p["onPrimaryContainer"])
     y += ph
+
+    # media transport (paths, matching Glyph.java)
+    y += dp(18)
+    mx = cx
+    for kind, big in (("prev", False), ("play", True), ("next", False)):
+        msz = dp(64) if big else dp(52)
+        top = y + (dp(64) - msz) // 2
+        fill = p["primary"] if big else p["surfaceContainerHigh"]
+        on = p["onPrimary"] if big else p["onSurface"]
+        pill(d, (mx, top, mx + msz, top + msz), fill)
+        ccx, ccy = mx + msz / 2, top + msz / 2
+        sz = msz * 0.46 * 0.5
+        if kind == "play":
+            d.polygon([(ccx - sz * 0.42, ccy - sz), (ccx + sz * 0.78, ccy),
+                       (ccx - sz * 0.42, ccy + sz)], fill=on)
+        elif kind == "prev":
+            d.polygon([(ccx + sz * 0.9, ccy - sz), (ccx - sz * 0.1, ccy),
+                       (ccx + sz * 0.9, ccy + sz)], fill=on)
+            d.polygon([(ccx + sz * 0.05, ccy - sz), (ccx - sz * 0.95, ccy),
+                       (ccx + sz * 0.05, ccy + sz)], fill=on)
+            d.rectangle([ccx - sz * 0.95, ccy - sz, ccx - sz * 0.72, ccy + sz], fill=on)
+        else:
+            d.polygon([(ccx - sz * 0.9, ccy - sz), (ccx + sz * 0.1, ccy),
+                       (ccx - sz * 0.9, ccy + sz)], fill=on)
+            d.polygon([(ccx - sz * 0.05, ccy - sz), (ccx + sz * 0.95, ccy),
+                       (ccx - sz * 0.05, ccy + sz)], fill=on)
+            d.rectangle([ccx + sz * 0.72, ccy - sz, ccx + sz * 0.95, ccy + sz], fill=on)
+        mx += msz + dp(10)
+    y += dp(64)
 
     # vehicle chips
     if chips:
@@ -194,11 +235,11 @@ def home(seed, apps, chips, path):
     d.text((cx, y + dp(14)), "Long-press a tile to change it",
            font=f_hint, fill=p["onSurfaceVariant"])
 
-    # ---- tile grid --------------------------------------------------
+    # ---- tile mosaic ------------------------------------------------
     gx0 = pad + left_w
     gw = inner_w - left_w
     gh = H - 2 * pad
-    cols, rows = 4, 3
+    cols, rows = 6, 3
     cw, chh = gw / cols, gh / rows
 
     roles = [("primaryContainer", "onPrimaryContainer"),
@@ -206,25 +247,30 @@ def home(seed, apps, chips, path):
              ("tertiaryContainer", "onTertiaryContainer"),
              ("surfaceContainerHigh", "onSurface")]
 
-    for i, name in enumerate(apps):
-        c, r = i % cols, i // cols
-        g = dp(8)
-        x0 = int(gx0 + c * cw) + g
-        y0 = int(pad + r * chh) + g
-        x1 = int(gx0 + (c + 1) * cw) - g
-        y1 = int(pad + (r + 1) * chh) - g
+    for i, name in enumerate(apps[:len(SPANS)]):
+        col, row, cspan, rspan = SPANS[i]
+        hero = cspan > 1 and rspan > 1
+        g = dp(7)
+        x0 = int(gx0 + col * cw) + g
+        y0 = int(pad + row * chh) + g
+        x1 = int(gx0 + (col + cspan) * cw) - g
+        y1 = int(pad + (row + rspan) * chh) - g
 
         fillk, onk = roles[i % 4]
         rounded(d, (x0, y0, x1, y1), FAMILY[i % len(FAMILY)], p[fillk])
 
-        isz = dp(52)
+        isz = dp(84) if hero else dp(48)
+        lsz = sp(22) if hero else sp(15)
+        f_lab = font(REG, lsz)
+        gap = dp(8)
+        block = isz + gap + int(lsz * 1.3)
+
+        iy = y0 + ((y1 - y0) - block) // 2
         ix = x0 + ((x1 - x0) - isz) // 2
-        iy = y0 + int((y1 - y0) * 0.5) - isz - dp(4)
         icon(d, (ix, iy, ix + isz, iy + isz), p[onk], name[0].upper(), p[fillk])
 
-        f_lab = font(REG, sp(15))
         lw = text_w(d, name, f_lab)
-        d.text((x0 + ((x1 - x0) - lw) / 2, iy + isz + dp(8)),
+        d.text((x0 + ((x1 - x0) - lw) / 2, iy + isz + gap),
                name, font=f_lab, fill=p[onk])
 
     img.convert("RGB").save(path)
