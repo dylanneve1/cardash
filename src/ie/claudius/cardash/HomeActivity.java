@@ -401,7 +401,9 @@ public class HomeActivity extends Activity {
             icon.setImageResource(android.R.drawable.ic_input_add);
             icon.setColorFilter(onFill);
         }
-        int isz = hero ? dp(104) : dp(64);
+        // The hero is wide now, not tall — a 104dp icon plus a label no
+        // longer fits its height and pushed the label out of the tile.
+        int isz = hero ? dp(72) : dp(64);
         holder.addView(icon, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
@@ -411,7 +413,7 @@ public class HomeActivity extends Activity {
         label.setText(entry != null ? entry.label : getString(R.string.empty_tile));
         label.setTextColor(onFill);
         label.setTypeface(Fonts.display(this));
-        label.setTextSize(hero ? 22 : 15);
+        label.setTextSize(hero ? 18 : 15);
         label.setMaxLines(1);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         label.setGravity(Gravity.CENTER);

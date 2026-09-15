@@ -112,12 +112,14 @@ public class Speedo extends View {
                     cy + (float) (Math.sin(a) * inner), ticks);
         }
 
-        number.setTextSize(size * 0.30f);
-        unit.setTextSize(size * 0.085f);
+        number.setTextSize(size * 0.28f);
+        unit.setTextSize(size * 0.072f);
         String text = hasFix ? String.valueOf(Math.round(shown)) : "--";
-        canvas.drawText(text, cx, cy + size * 0.10f, number);
-        canvas.drawText(hasFix ? "km/h · GPS" : "waiting for GPS",
-                cx, cy + size * 0.26f, unit);
+        canvas.drawText(text, cx, cy + size * 0.07f, number);
+        // Keep the caption inside the ring: the arc's gap is at the
+        // bottom and a longer string used to run straight through it.
+        canvas.drawText(hasFix ? "km/h · GPS" : "no GPS fix",
+                cx, cy + size * 0.20f, unit);
 
         if (shown != kph) postInvalidateOnAnimation();
     }
