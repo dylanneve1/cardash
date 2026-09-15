@@ -169,7 +169,7 @@ public class HomeActivity extends Activity {
         clock.setTextColor(m3.primary());
         clock.setTextSize(72);
         // Expressive leans on weight contrast rather than decoration.
-        clock.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        clock.setTypeface(Fonts.display());
         clock.setLetterSpacing(-0.03f);
         panel.addView(clock);
 
@@ -291,6 +291,16 @@ public class HomeActivity extends Activity {
         tile.setPadding(dp(8), dp(8), dp(8), dp(8));
         Shapes.springy(tile);
 
+        // Material 3 Expressive icon holder — clover, flower, burst,
+        // squircle. The shape carries the variety; the app icon stays
+        // recognisable inside it.
+        FrameLayout holder = new FrameLayout(this);
+        holder.setBackground(new MaterialShape(
+                MaterialShape.forIndex(slot), M3.withAlpha(onFill, 0x30),
+                slot * 11f));
+        int hp = hero ? dp(18) : dp(11);
+        holder.setPadding(hp, hp, hp, hp);
+
         ImageView icon = new ImageView(this);
         if (entry != null) {
             icon.setImageDrawable(entry.icon);
@@ -298,13 +308,16 @@ public class HomeActivity extends Activity {
             icon.setImageResource(android.R.drawable.ic_input_add);
             icon.setColorFilter(onFill);
         }
-        int isz = hero ? dp(84) : dp(48);
-        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(isz, isz);
-        tile.addView(icon, ip);
+        int isz = hero ? dp(104) : dp(64);
+        holder.addView(icon, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        tile.addView(holder, new LinearLayout.LayoutParams(isz, isz));
 
         TextView label = new TextView(this);
         label.setText(entry != null ? entry.label : getString(R.string.empty_tile));
         label.setTextColor(onFill);
+        label.setTypeface(Fonts.display());
         label.setTextSize(hero ? 22 : 15);
         label.setMaxLines(1);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);

@@ -9,6 +9,7 @@ and the colours come from running the app's own M3 class on the JVM.
 So layout, proportion and palette are faithful; only the rasteriser and
 the app icons are stand-ins.
 """
+import math
 import subprocess
 import sys
 import os
@@ -127,17 +128,57 @@ def text_w(draw, s, f):
     return draw.textbbox((0, 0), s, font=f)[2]
 
 
-def icon(draw, box, fill, letter, on):
-    rounded(draw, box, (14, 14, 14, 14), fill)
+# MaterialShape.CYCLE, verbatim.
+SHAPES = [("squircle", 0, 0.0), ("clover", 4, 0.14), ("flower", 6, 0.11),
+          ("squircle", 0, 0.0), ("burst", 8, 0.09), ("scallop", 12, 0.055)]
+
+
+def blend(hex_a, hex_b, t):
+    """hex_a over hex_b at opacity t."""
+    a = [int(hex_a[1:][i:i + 2], 16) for i in (0, 2, 4)]
+    b = [int(hex_b[1:][i:i + 2], 16) for i in (0, 2, 4)]
+    return "#%02X%02X%02X" % tuple(int(a[i] * t + b[i] * (1 - t)) for i in range(3))
+
+
+def shape_points(box, index, samples=240):
+    """Mirrors MaterialShape: superellipse or lobed polar curve."""
+    _, lobes, amp = SHAPES[index % len(SHAPES)]
+    x0, y0, x1, y1 = box
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    rx, ry = (x1 - x0) / 2, (y1 - y0) / 2
+    phase = math.radians(index * 11.0)
+    pts = []
+    if lobes == 0:
+        n = 4.0
+        for i in range(samples):
+            t = 2 * math.pi * i / samples
+            ct, st = math.cos(t), math.sin(t)
+            pts.append((
+                cx + rx * (1 if ct >= 0 else -1) * abs(ct) ** (2.0 / n),
+                cy + ry * (1 if st >= 0 else -1) * abs(st) ** (2.0 / n)))
+    else:
+        sx, sy = rx / (1 + amp), ry / (1 + amp)
+        for i in range(samples):
+            t = 2 * math.pi * i / samples
+            r = 1 + amp * math.cos(lobes * (t + phase))
+            pts.append((cx + sx * r * math.cos(t), cy + sy * r * math.sin(t)))
+    return pts
+
+
+def icon(draw, box, fill, letter, on, index=0):
     size = box[3] - box[1]
-    f = font(MED, int(size * 0.5))
+    draw.polygon(shape_points(box, index), fill=fill)
+    f = font(MED, int(size * 0.42))
     bb = draw.textbbox((0, 0), letter, font=f)
     draw.text((box[0] + (size - (bb[2] - bb[0])) / 2 - bb[0],
                box[1] + (size - (bb[3] - bb[1])) / 2 - bb[1]),
               letter, font=f, fill=on)
 
 
-def home(seed, apps, chips, path):
+MINIMAL = [(0, 0, 2, 3), (2, 0, 2, 3), (4, 0, 2, 3)]
+
+
+def home(seed, apps, chips, path, spans=None):
     p = palette(seed)
     img = wallpaper(seed).convert("RGBA")
     layer = Image.new("RGBA", (W, H), p["surface"] + "D8")
@@ -247,8 +288,9 @@ def home(seed, apps, chips, path):
              ("tertiaryContainer", "onTertiaryContainer"),
              ("surfaceContainerHigh", "onSurface")]
 
-    for i, name in enumerate(apps[:len(SPANS)]):
-        col, row, cspan, rspan = SPANS[i]
+    layout = spans or SPANS
+    for i, name in enumerate(apps[:len(layout)]):
+        col, row, cspan, rspan = layout[i]
         hero = cspan > 1 and rspan > 1
         g = dp(7)
         x0 = int(gx0 + col * cw) + g
@@ -259,7 +301,7 @@ def home(seed, apps, chips, path):
         fillk, onk = roles[i % 4]
         rounded(d, (x0, y0, x1, y1), FAMILY[i % len(FAMILY)], p[fillk])
 
-        isz = dp(84) if hero else dp(48)
+        isz = dp(104) if hero else dp(64)
         lsz = sp(22) if hero else sp(15)
         f_lab = font(REG, lsz)
         gap = dp(8)
@@ -267,7 +309,8 @@ def home(seed, apps, chips, path):
 
         iy = y0 + ((y1 - y0) - block) // 2
         ix = x0 + ((x1 - x0) - isz) // 2
-        icon(d, (ix, iy, ix + isz, iy + isz), p[onk], name[0].upper(), p[fillk])
+        icon(d, (ix, iy, ix + isz, iy + isz),
+             blend(p[onk], p[fillk], 0.19), name[0].upper(), p[onk], i)
 
         lw = text_w(d, name, f_lab)
         d.text((x0 + ((x1 - x0) - lw) / 2, iy + isz + gap),
@@ -307,8 +350,9 @@ def all_apps(seed, names, path):
         isz = dp(48)
         ix = x0 + ((x1 - x0) - isz) // 2
         iy = y0 + dp(16)
-        icon(d, (ix, iy, ix + isz, iy + isz), p["primaryContainer"],
-             name[0].upper(), p["onPrimaryContainer"])
+        icon(d, (ix, iy, ix + isz, iy + isz),
+             blend(p["onSurface"], p["surfaceContainer"], 0.19),
+             name[0].upper(), p["onSurface"], i)
 
         f_lab = font(REG, sp(14))
         lw = text_w(d, name, f_lab)
@@ -334,6 +378,9 @@ if __name__ == "__main__":
     home("2E8B57", tiles, [
         ("Fuel 11%", "warn"), ("72°C", "ok"), ("Door open", "alert"),
     ], os.path.join(out, "03-home-green-warnings.png"))
+    home("4F7BD5", ["CarPlay", "Bluetooth", "Settings"], [],
+         os.path.join(out, "05-home-minimal.png"), spans=MINIMAL)
+
     all_apps("4F7BD5", [
         "Android Auto", "Bluetooth", "CarPlay", "Equaliser", "FM Radio",
         "Gallery", "Maps", "Music", "Settings", "USB", "Video", "YouTube",
