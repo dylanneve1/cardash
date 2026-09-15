@@ -30,7 +30,7 @@ public final class Apps {
 
     private static final String PREFS = "cardash";
     private static final String KEY_TILE = "tile_";
-    public static final int TILES = 12;
+    public static final int TILES = 7;
 
     /**
      * Sensible first-run tiles for a Jancar-based head unit, in priority

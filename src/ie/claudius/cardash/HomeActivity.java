@@ -27,6 +27,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+import ie.claudius.cardash.dash.SpeedSource;
+import ie.claudius.cardash.dash.Speedo;
+import ie.claudius.cardash.dash.Weather;
 import ie.claudius.cardash.media.NowPlaying;
 import ie.claudius.cardash.vehicle.VehicleHub;
 import ie.claudius.cardash.vehicle.VehicleState;
@@ -36,24 +39,22 @@ import ie.claudius.cardash.vehicle.VehicleState;
 public class HomeActivity extends Activity {
 
     private static final int REQ_PICK = 1;
-    private static final int COLUMNS = 6;
-    private static final int ROWS = 3;
+    private static final int COLUMNS = 2;
+    private static final int ROWS = 4;
 
     /**
-     * The mosaic: {column, row, colSpan, rowSpan} per tile.
-     *
-     * Material 3 Expressive varies container SIZE, not just corner
-     * radius — a grid of identical squares is the thing it exists to
-     * get away from. The 2x2 hero is also the one you want to hit
-     * without looking, so the biggest target is the most-used app.
+     * {column, row, colSpan, rowSpan}. Narrower column than before, so
+     * the variety comes from one wide tile at the top rather than a
+     * full mosaic — cramming a 6-wide grid into a third of the screen
+     * would give targets too small to hit while moving.
      */
     private static final int[][] SPANS = {
-            { 0, 0, 2, 2 },
-            { 2, 0, 2, 1 }, { 4, 0, 2, 1 },
-            { 2, 1, 1, 1 }, { 3, 1, 1, 1 }, { 4, 1, 2, 1 },
-            { 0, 2, 1, 1 }, { 1, 2, 1, 1 }, { 2, 2, 1, 1 },
-            { 3, 2, 1, 1 }, { 4, 2, 1, 1 }, { 5, 2, 1, 1 },
+            { 0, 0, 2, 1 },
+            { 0, 1, 1, 1 }, { 1, 1, 1, 1 },
+            { 0, 2, 1, 1 }, { 1, 2, 1, 1 },
+            { 0, 3, 1, 1 }, { 1, 3, 1, 1 },
     };
+
     /** Used when the wallpaper has no extractable colour (solid black, etc). */
     private static final int FALLBACK_SEED = 0xFF4F7BD5;
 
@@ -67,6 +68,10 @@ public class HomeActivity extends Activity {
     private ImageView albumArt;
     private ImageView playButton;
     private TextView trackTitle, trackArtist;
+    private Speedo speedo;
+    private TextView weatherTemp, weatherDesc;
+    private SpeedSource speed;
+    private final Weather weather = new Weather();
     private int pendingSlot = -1;
 
     private final BroadcastReceiver timeTick = new BroadcastReceiver() {
@@ -92,6 +97,26 @@ public class HomeActivity extends Activity {
         f.addAction(Intent.ACTION_TIMEZONE_CHANGED);
         registerReceiver(timeTick, f);
         updateClock();
+        if (speed == null) speed = new SpeedSource(this);
+        speed.start(new SpeedSource.Listener() {
+            @Override
+            public void onSpeed(float kph, boolean hasFix) {
+                if (speedo != null) speedo.setSpeed(kph, hasFix);
+            }
+
+            @Override
+            public void onPosition(double lat, double lon) {
+                weather.setLocation(lat, lon);
+            }
+        });
+        weather.start(new Weather.Listener() {
+            @Override
+            public void onWeather(int tempC, String description, int code) {
+                if (weatherTemp == null) return;
+                weatherTemp.setText(tempC + "\u00B0");
+                weatherDesc.setText(description);
+            }
+        });
         if (nowPlaying == null) nowPlaying = new NowPlaying(this);
         nowPlaying.start(new NowPlaying.Listener() {
             @Override
@@ -120,6 +145,8 @@ public class HomeActivity extends Activity {
         }
         vehicle.stop();
         if (nowPlaying != null) nowPlaying.stop();
+        if (speed != null) speed.stop();
+        weather.stop();
     }
 
     /** Home is the bottom of the stack — back should do nothing at all. */
@@ -163,9 +190,11 @@ public class HomeActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         row.addView(buildClockPanel(), new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.MATCH_PARENT, 0.34f));
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 0.30f));
+        row.addView(buildDashPanel(), new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 0.30f));
         row.addView(buildGrid(), new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.MATCH_PARENT, 0.66f));
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 0.40f));
 
         setContentView(root);
         updateClock();
@@ -244,6 +273,60 @@ public class HomeActivity extends Activity {
         return wrapMargin(panel, 0, 0, dp(16), 0);
     }
 
+    /** Middle column: GPS speedometer over a weather card. */
+    private View buildDashPanel() {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout gauge = new LinearLayout(this);
+        gauge.setGravity(Gravity.CENTER);
+        gauge.setBackground(Shapes.round(density, m3.surfaceContainer(), 36));
+        speedo = new Speedo(this);
+        speedo.setColors(M3.withAlpha(m3.onSurface(), 0x1F), m3.primary(),
+                m3.onSurface(), m3.onSurfaceVariant());
+        speedo.setTypefaces(Fonts.display(this), Fonts.body(this));
+        gauge.addView(speedo, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        gp.leftMargin = dp(8);
+        gp.rightMargin = dp(8);
+        col.addView(gauge, gp);
+
+        LinearLayout wx = new LinearLayout(this);
+        wx.setOrientation(LinearLayout.VERTICAL);
+        wx.setGravity(Gravity.CENTER);
+        wx.setBackground(Shapes.round(density, m3.secondaryContainer(), 28));
+        int p = dp(14);
+        wx.setPadding(p, p, p, p);
+
+        weatherTemp = new TextView(this);
+        weatherTemp.setTypeface(Fonts.display(this));
+        weatherTemp.setTextColor(m3.onSecondaryContainer());
+        weatherTemp.setTextSize(30);
+        weatherTemp.setIncludeFontPadding(false);
+        weatherTemp.setText("--");
+        wx.addView(weatherTemp);
+
+        weatherDesc = new TextView(this);
+        weatherDesc.setTypeface(Fonts.body(this));
+        weatherDesc.setTextColor(M3.withAlpha(m3.onSecondaryContainer(), 0xCC));
+        weatherDesc.setTextSize(14);
+        weatherDesc.setPadding(0, dp(4), 0, 0);
+        weatherDesc.setText(R.string.weather_waiting);
+        wx.addView(weatherDesc);
+
+        LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        wp.topMargin = dp(12);
+        wp.leftMargin = dp(8);
+        wp.rightMargin = dp(8);
+        col.addView(wx, wp);
+        return col;
+    }
+
     private View buildGrid() {
         GridLayout grid = new GridLayout(this);
         grid.setColumnCount(COLUMNS);
@@ -251,7 +334,7 @@ public class HomeActivity extends Activity {
 
         for (int i = 0; i < Apps.TILES && i < SPANS.length; i++) {
             int[] sp = SPANS[i];
-            boolean hero = sp[2] > 1 && sp[3] > 1;
+            boolean hero = sp[2] > 1;
             View tile = buildTile(i, hero);
 
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();

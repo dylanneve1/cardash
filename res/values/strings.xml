@@ -6,4 +6,5 @@
     <string name="empty_tile">Add</string>
     <string name="hint_long_press">Long-press a tile to change it</string>
     <string name="nothing_playing">Nothing playing</string>
+    <string name="weather_waiting">Weather unavailable</string>
 </resources>

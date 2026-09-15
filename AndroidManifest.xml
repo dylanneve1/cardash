@@ -15,6 +15,11 @@
     <!-- OBD-II dongles are Bluetooth serial. Body-CAN data instead
          arrives as broadcasts from the head unit's vendor car service,
          which needs no permission. -->
+    <!-- GPS drives the speedometer and gives the weather card a
+         position; no canbox and no OBD dongle needed. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
