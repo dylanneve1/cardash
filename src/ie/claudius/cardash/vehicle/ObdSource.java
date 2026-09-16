@@ -10,6 +10,10 @@ import android.util.Log;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -20,6 +24,11 @@ import java.util.UUID;
  * Clones are riddled with firmware quirks and half of them answer
  * "NO DATA" or "?" to perfectly legal requests, so nothing here treats
  * a reply as trustworthy until it parses cleanly.
+ *
+ * Every raw reply is kept, verbatim, for the Diagnostics screen. That
+ * is what settles "does this Yaris support fuel level" versus "is this
+ * clone dongle misbehaving" — a question that otherwise costs an
+ * afternoon.
  *
  * PIDs polled:
  *   010C  engine RPM          ((A*256)+B)/4
@@ -34,10 +43,22 @@ public final class ObdSource implements VehicleSource {
     private static final UUID SPP =
             UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final long POLL_MS = 1000L;
+    private static final String[] NAME_HINTS = { "OBD", "ELM", "VLINK", "VGATE", "KONNWEI" };
+
+    /** Snapshot for the Diagnostics screen. */
+    public static final class Diag {
+        public final List<String> paired = new ArrayList<>();
+        public String matched;
+        public String socket;
+        public final Map<String, String> raw = new LinkedHashMap<>();
+    }
 
     private volatile boolean running;
     private Thread worker;
     private BluetoothSocket socket;
+    private String socketState = "not started";
+    private long lastUpdate;
+    private final Map<String, String> raw = new LinkedHashMap<>();
 
     private final VehicleState state = new VehicleState();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -52,6 +73,48 @@ public final class ObdSource implements VehicleSource {
         return findAdapter() != null;
     }
 
+    @Override
+    public String status(Context ctx) {
+        BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
+        if (bt == null) return "no Bluetooth adapter on this unit";
+        try {
+            if (!bt.isEnabled()) return "Bluetooth is off";
+            if (findAdapter() == null) {
+                return "no paired device named like an ELM327 ("
+                        + bt.getBondedDevices().size() + " paired)";
+            }
+        } catch (SecurityException e) {
+            return "Bluetooth permission refused";
+        }
+        return socketState;
+    }
+
+    @Override
+    public long lastUpdateMillis() {
+        return lastUpdate;
+    }
+
+    public Diag diag() {
+        Diag d = new Diag();
+        try {
+            BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
+            if (bt != null) {
+                for (BluetoothDevice dev : bt.getBondedDevices()) {
+                    d.paired.add(dev.getName() + "  " + dev.getAddress());
+                }
+            }
+            BluetoothDevice m = findAdapter();
+            d.matched = m == null ? null : m.getName() + "  " + m.getAddress();
+        } catch (SecurityException e) {
+            d.paired.add("(Bluetooth permission refused)");
+        }
+        d.socket = socketState;
+        synchronized (raw) {
+            d.raw.putAll(raw);
+        }
+        return d;
+    }
+
     /** A paired device whose name looks like an ELM327 clone. */
     private BluetoothDevice findAdapter() {
         try {
@@ -61,10 +124,7 @@ public final class ObdSource implements VehicleSource {
                 String n = d.getName();
                 if (n == null) continue;
                 String u = n.toUpperCase();
-                if (u.contains("OBD") || u.contains("ELM") || u.contains("VLINK")
-                        || u.contains("VGATE") || u.contains("KONNWEI")) {
-                    return d;
-                }
+                for (String hint : NAME_HINTS) if (u.contains(hint)) return d;
             }
         } catch (SecurityException e) {
             // Bluetooth permission refused; treat as simply unavailable.
@@ -77,6 +137,7 @@ public final class ObdSource implements VehicleSource {
     public void start(Context ctx, final VehicleState.Listener listener) {
         if (running) return;
         running = true;
+        socketState = "connecting";
         worker = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -91,6 +152,7 @@ public final class ObdSource implements VehicleSource {
     public void stop() {
         running = false;
         closeQuietly();
+        socketState = "stopped";
         if (worker != null) worker.interrupt();
         worker = null;
     }
@@ -112,10 +174,12 @@ public final class ObdSource implements VehicleSource {
                 state.coolantC = intPid(out, in, "0105", 1, COOLANT);
                 state.fuelPercent = intPid(out, in, "012F", 1, PERCENT);
 
+                lastUpdate = System.currentTimeMillis();
                 publish(listener);
                 sleep(POLL_MS);
             } catch (Exception e) {
                 Log.w(TAG, "poll failed: " + e);
+                socketState = "poll failed: " + e.getMessage();
                 closeQuietly();
                 sleep(3000);
             }
@@ -124,20 +188,25 @@ public final class ObdSource implements VehicleSource {
 
     private boolean connect() {
         BluetoothDevice dev = findAdapter();
-        if (dev == null) return false;
+        if (dev == null) {
+            socketState = "no adapter paired";
+            return false;
+        }
         try {
             socket = dev.createRfcommSocketToServiceRecord(SPP);
             socket.connect();
             OutputStream out = socket.getOutputStream();
             InputStream in = socket.getInputStream();
-            // Reset, echo off, linefeeds off, auto protocol.
+            // Reset, echo off, linefeeds off, spaces off, auto protocol.
             for (String init : new String[] { "ATZ", "ATE0", "ATL0", "ATS0", "ATSP0" }) {
                 send(out, init);
-                readUntilPrompt(in);
+                record(init, readUntilPrompt(in));
             }
+            socketState = "connected to " + dev.getName();
             return true;
         } catch (Exception e) {
             Log.w(TAG, "connect failed: " + e);
+            socketState = "connect failed: " + e.getMessage();
             closeQuietly();
             return false;
         }
@@ -165,11 +234,27 @@ public final class ObdSource implements VehicleSource {
         try {
             send(out, pid);
             String reply = readUntilPrompt(in);
+            record(pid, reply);
             int[] bytes = ObdParse.payload(reply, pid, expected);
             if (bytes == null) return VehicleState.UNKNOWN_INT;
             return decode.apply(bytes);
         } catch (Exception e) {
+            record(pid, "EXCEPTION " + e);
             return VehicleState.UNKNOWN_INT;
+        }
+    }
+
+    /** Keep the reply exactly as it came, control characters made visible. */
+    private void record(String cmd, String reply) {
+        StringBuilder sb = new StringBuilder();
+        for (char c : reply.toCharArray()) {
+            if (c == '\r') sb.append("\\r");
+            else if (c == '\n') sb.append("\\n");
+            else if (c < 0x20) sb.append(String.format("\\x%02X", (int) c));
+            else sb.append(c);
+        }
+        synchronized (raw) {
+            raw.put(cmd, sb.toString());
         }
     }
 

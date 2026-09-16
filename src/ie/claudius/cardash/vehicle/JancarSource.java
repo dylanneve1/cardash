@@ -7,6 +7,8 @@ import android.content.IntentFilter;
 import android.os.Bundle;
 import android.util.Log;
 
+import ie.claudius.cardash.Receivers;
+
 /**
  * Body-CAN data by way of the head unit's own vendor car service.
  *
@@ -17,18 +19,20 @@ import android.util.Log;
  *
  * Rather than invent a protocol, this listens on the plausible action
  * names AND logs every extra of anything it does receive, tagged
- * "CarDash/CAN". Fit a canbox, watch logcat, and the real keys fall
- * out in a couple of minutes — then they go in KEY_* below and this
- * becomes a real source. Until then it reports nothing, and the UI
+ * "CarDash/CAN". The Diagnostics screen goes further: it reads the
+ * actions the vendor packages declare in their own manifests and sniffs
+ * all of them live, so the real names can be read off the screen
+ * without a canbox ever being fitted. Then they go in KEY_* below and
+ * this becomes a real source. Until then it reports nothing, and the UI
  * hides the vehicle strip entirely rather than showing invented zeros.
  */
 public final class JancarSource implements VehicleSource {
 
     private static final String TAG = "CarDash/CAN";
-    private static final String VENDOR_PKG = "com.jancar.services";
+    public static final String VENDOR_PKG = "com.jancar.services";
 
     /** Candidate broadcasts seen referenced across Jancar-based ROMs. */
-    private static final String[] ACTIONS = {
+    public static final String[] CANDIDATE_ACTIONS = {
             "com.jancar.service.CAR_INFO",
             "com.jancar.service.CAR_DATA",
             "com.jancar.services.CAR_STATE",
@@ -47,21 +51,55 @@ public final class JancarSource implements VehicleSource {
     private static final String KEY_FUEL = "fuel_level";
 
     private final VehicleState state = new VehicleState();
+    private Context registeredOn;
     private BroadcastReceiver receiver;
+    private long lastUpdate;
+    private int received;
+    private String lastAction;
 
     @Override
     public String name() {
         return "Head unit CAN";
     }
 
+    /**
+     * The known vendor service, or anything the Diagnostics sweep found
+     * declaring car-ish broadcasts. Vendors rename the service between
+     * ROM builds; the sweep result is what actually exists on this unit.
+     */
     @Override
     public boolean isAvailable(Context ctx) {
-        try {
-            ctx.getPackageManager().getPackageInfo(VENDOR_PKG, 0);
-            return true;
-        } catch (Exception e) {
-            return false;
+        return vendorPackage(ctx) != null;
+    }
+
+    private static String vendorPackage(Context ctx) {
+        java.util.List<String> candidates = new java.util.ArrayList<>();
+        candidates.add(VENDOR_PKG);
+        candidates.addAll(ie.claudius.cardash.diag.Probe.rememberedSweep(ctx));
+        for (String pkg : candidates) {
+            try {
+                ctx.getPackageManager().getPackageInfo(pkg, 0);
+                return pkg;
+            } catch (Exception ignored) {
+                // not this one
+            }
         }
+        return null;
+    }
+
+    @Override
+    public String status(Context ctx) {
+        String pkg = vendorPackage(ctx);
+        if (pkg == null) return "no vendor car service found (run Diagnostics to sweep)";
+        if (receiver == null) return pkg + " present, not listening";
+        if (received == 0) return "listening on " + CANDIDATE_ACTIONS.length
+                + " candidate actions, nothing received";
+        return received + " broadcasts, last " + lastAction;
+    }
+
+    @Override
+    public long lastUpdateMillis() {
+        return lastUpdate;
     }
 
     @Override
@@ -70,37 +108,45 @@ public final class JancarSource implements VehicleSource {
         receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context c, Intent intent) {
+                received++;
+                lastAction = intent.getAction();
                 dumpForDiscovery(intent);
-                if (apply(intent)) listener.onVehicleState(state);
+                if (apply(intent)) {
+                    lastUpdate = System.currentTimeMillis();
+                    listener.onVehicleState(state);
+                }
             }
         };
         IntentFilter f = new IntentFilter();
-        for (String a : ACTIONS) f.addAction(a);
-        ctx.registerReceiver(receiver, f);
+        for (String a : CANDIDATE_ACTIONS) f.addAction(a);
+        registeredOn = ctx.getApplicationContext();
+        // Exported: the broadcasts come from the vendor's own package.
+        Receivers.register(registeredOn, receiver, f, true);
     }
 
     @Override
     public void stop() {
-        // Caller owns the context; unregister happens there.
+        if (registeredOn != null) Receivers.unregister(registeredOn, receiver);
         receiver = null;
-    }
-
-    public BroadcastReceiver receiver() {
-        return receiver;
+        registeredOn = null;
     }
 
     /** Log everything so the real key names can be read off logcat. */
     private void dumpForDiscovery(Intent intent) {
+        Log.i(TAG, describe(intent));
+    }
+
+    /** "ACTION key=value (Type) ..." — the type is half the battle. */
+    public static String describe(Intent intent) {
         Bundle b = intent.getExtras();
-        if (b == null) {
-            Log.i(TAG, intent.getAction() + " (no extras)");
-            return;
-        }
-        StringBuilder sb = new StringBuilder(intent.getAction()).append(' ');
+        StringBuilder sb = new StringBuilder(String.valueOf(intent.getAction()));
+        if (b == null) return sb.append(" (no extras)").toString();
         for (String k : b.keySet()) {
-            sb.append(k).append('=').append(b.get(k)).append(' ');
+            Object v = b.get(k);
+            sb.append("\n    ").append(k).append('=').append(v)
+                    .append(" (").append(v == null ? "null" : v.getClass().getSimpleName()).append(')');
         }
-        Log.i(TAG, sb.toString());
+        return sb.toString();
     }
 
     private boolean apply(Intent i) {

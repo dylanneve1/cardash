@@ -46,6 +46,22 @@ public final class VehicleState {
                 || boot != Tri.UNKNOWN;
     }
 
+    /** Fields with a value, out of the eleven — a health number for diagnostics. */
+    public int knownCount() {
+        int n = 0;
+        if (fuelPercent != UNKNOWN_INT) n++;
+        if (speedKph != UNKNOWN_INT) n++;
+        if (rpm != UNKNOWN_INT) n++;
+        if (coolantC != UNKNOWN_INT) n++;
+        for (Tri t : new Tri[] { doorFrontLeft, doorFrontRight, doorRearLeft,
+                doorRearRight, boot, handbrake, reverse }) {
+            if (t != Tri.UNKNOWN) n++;
+        }
+        return n;
+    }
+
+    public static final int FIELDS = 11;
+
     /** How many doors are actually standing open right now. */
     public int openDoors() {
         int n = 0;

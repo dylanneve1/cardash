@@ -1,6 +1,7 @@
 package ie.claudius.cardash;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -13,6 +14,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import ie.claudius.cardash.dash.Trip;
+import ie.claudius.cardash.diag.DiagnosticsActivity;
 
 /**
  * Settings, built the same way as everything else: in code, from the
@@ -148,9 +150,10 @@ public class SettingsActivity extends Activity {
                 new int[] { R.string.s_media_full, R.string.s_media_compact, R.string.s_media_hide },
                 false));
         card.addView(divider());
-        card.addView(row(R.string.s_vehicle, R.string.s_vehicle_caption, Prefs.VEHICLE, "show",
-                new String[] { "show", "hide" },
-                new int[] { R.string.s_vehicle_show, R.string.s_vehicle_hide }, false));
+        card.addView(row(R.string.s_vehicle, R.string.s_vehicle_caption, Prefs.VEHICLE, "auto",
+                new String[] { "auto", "obd", "can", "off" },
+                new int[] { R.string.s_vehicle_auto, R.string.s_vehicle_obd,
+                        R.string.s_vehicle_can, R.string.s_vehicle_off }, false));
         card.addView(divider());
         card.addView(actionRow(R.string.s_trip_reset, R.string.s_trip_reset_caption,
                 R.string.s_reset_action, new Runnable() {
@@ -190,6 +193,9 @@ public class SettingsActivity extends Activity {
                         Apps.reset(SettingsActivity.this);
                     }
                 }));
+        card.addView(divider());
+        card.addView(linkRow(R.string.s_diag, R.string.s_diag_caption, R.string.s_diag_open,
+                new Intent(this, DiagnosticsActivity.class)));
         column.addView(card, cardParams(dp(16)));
 
         View old = page;
@@ -393,6 +399,20 @@ public class SettingsActivity extends Activity {
             group.addView(dot, lp);
         }
         row.addView(hs);
+        return row;
+    }
+
+    /** A row whose button opens another screen. */
+    private View linkRow(int titleRes, int captionRes, int actionRes, final Intent target) {
+        LinearLayout row = rowShell(titleRes, captionRes);
+        TextView button = pill(getString(actionRes), false);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(target);
+            }
+        });
+        row.addView(button);
         return row;
     }
 

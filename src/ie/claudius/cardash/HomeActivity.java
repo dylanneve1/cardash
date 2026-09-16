@@ -28,6 +28,7 @@ import ie.claudius.cardash.dash.SpeedSource;
 import ie.claudius.cardash.dash.Speedo;
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.dash.Weather;
+import ie.claudius.cardash.diag.DiagnosticsActivity;
 import ie.claudius.cardash.media.NowPlaying;
 import ie.claudius.cardash.vehicle.VehicleHub;
 import ie.claudius.cardash.vehicle.VehicleState;
@@ -60,7 +61,20 @@ public class HomeActivity extends Activity {
     private TextView clock, date;
     private LinearLayout vehicleBar;
     private final Map<String, TextView> chips = new HashMap<>();
-    private final VehicleHub vehicle = new VehicleHub();
+    private final VehicleHub vehicle = VehicleHub.shared();
+    private final VehicleState.Listener vehicleListener = new VehicleState.Listener() {
+        @Override
+        public void onVehicleState(VehicleState state) {
+            lastVehicle = state;
+            if (state.speedKph != VehicleState.UNKNOWN_INT) {
+                obdSpeedAt = System.currentTimeMillis();
+                lastKph = state.speedKph;
+                lastFix = true;
+                if (speedo != null) speedo.setSpeed(lastKph, true);
+            }
+            renderVehicle();
+        }
+    };
     private NowPlaying nowPlaying;
     private ImageView albumArt;
     private ImageView playButton;
@@ -85,6 +99,9 @@ public class HomeActivity extends Activity {
     private VehicleState lastVehicle;
     private float lastKph;
     private boolean lastFix;
+    /** GPS speed yields to OBD speed for this long after each OBD reading. */
+    private static final long OBD_SPEED_HOLD_MS = 3000L;
+    private long obdSpeedAt;
 
     private final BroadcastReceiver timeTick = new BroadcastReceiver() {
         @Override
@@ -110,11 +127,15 @@ public class HomeActivity extends Activity {
         IntentFilter f = new IntentFilter(Intent.ACTION_TIME_TICK);
         f.addAction(Intent.ACTION_TIME_CHANGED);
         f.addAction(Intent.ACTION_TIMEZONE_CHANGED);
-        registerReceiver(timeTick, f);
+        Receivers.register(this, timeTick, f, false);
         if (speed == null) speed = new SpeedSource(this);
         speed.start(new SpeedSource.Listener() {
             @Override
             public void onSpeed(float kph, boolean hasFix) {
+                // The car's own speed beats GPS — no lag under braking,
+                // no dropout in a tunnel — so while OBD is reporting,
+                // GPS only feeds the trip meter.
+                if (System.currentTimeMillis() - obdSpeedAt < OBD_SPEED_HOLD_MS) return;
                 lastKph = kph;
                 lastFix = hasFix;
                 if (speedo != null) speedo.setSpeed(kph, hasFix);
@@ -157,13 +178,7 @@ public class HomeActivity extends Activity {
                 renderNowPlaying();
             }
         });
-        vehicle.start(this, new VehicleState.Listener() {
-            @Override
-            public void onVehicleState(VehicleState state) {
-                lastVehicle = state;
-                renderVehicle();
-            }
-        });
+        if (Prefs.showVehicle(this)) vehicle.start(this, vehicleListener, Prefs.vehicleMode(this));
 
         // A setting, the wallpaper, or the set of installed apps may
         // have changed while we were away.
@@ -189,14 +204,10 @@ public class HomeActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        try {
-            unregisterReceiver(timeTick);
-        } catch (IllegalArgumentException ignored) {
-            // never registered; harmless
-        }
+        Receivers.unregister(this, timeTick);
         ThemeWatch.stop(this, themeWatch);
         themeWatch = null;
-        vehicle.stop();
+        vehicle.stop(vehicleListener);
         if (nowPlaying != null) nowPlaying.stop();
         if (speed != null) speed.stop();
         trip.setListener(null);
@@ -300,6 +311,16 @@ public class HomeActivity extends Activity {
         // the digits never use, which opened a hole between the clock
         // and the date on the real panel.
         clock.setIncludeFontPadding(false);
+        // The diagnostics instrument hides behind the clock: needed
+        // rarely, but needed from the car, without a keyboard.
+        clock.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                startActivity(new Intent(HomeActivity.this, DiagnosticsActivity.class));
+                return true;
+            }
+        });
         panel.addView(clock);
 
         date = new TextView(this);

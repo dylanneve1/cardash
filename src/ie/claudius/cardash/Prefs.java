@@ -35,11 +35,13 @@ public final class Prefs {
     // ---- widgets ----
     public static final String DATE = "date";         // full | short | hide
     public static final String MEDIA = "media";       // full | compact | hide
-    public static final String VEHICLE = "vehicle";   // show | hide
+    public static final String VEHICLE = "vehicle";   // auto | obd | can | off
     public static final String DASH = "dash";         // comma list of speedo,trip,weather
     public static final String GAUGE = "gauge";       // arc | digits
     public static final String SCALE = "scale";       // auto | city | fast
     public static final String PRESET = "preset";     // classic | driver | launcher | minimal | ""
+    /** Typed by hand from the factory settings menu; see DiagnosticsActivity. */
+    public static final String CANBOX_PROTOCOLS = "canbox_protocols";
 
     public static final String W_SPEEDO = "speedo", W_TRIP = "trip", W_WEATHER = "weather";
     public static final String[] DASH_ALL = { W_SPEEDO, W_TRIP, W_WEATHER };
@@ -151,8 +153,13 @@ public final class Prefs {
         return get(ctx, MEDIA, "full");
     }
 
+    /** Which vehicle sources to run — one of VehicleHub.MODE_*. */
+    public static String vehicleMode(Context ctx) {
+        return get(ctx, VEHICLE, "auto");
+    }
+
     public static boolean showVehicle(Context ctx) {
-        return !"hide".equals(get(ctx, VEHICLE, "show"));
+        return !"off".equals(vehicleMode(ctx));
     }
 
     /** The middle-column widgets, in DASH_ALL order; may be empty. */
@@ -206,20 +213,20 @@ public final class Prefs {
                 e.putString(DASH, W_SPEEDO + "," + W_TRIP + ",");
                 e.putString(GAUGE, "arc").putString(MEDIA, "compact")
                         .putString(DATE, "short").putString(LAYOUT, "hero")
-                        .putString(VEHICLE, "show").putString(HINT, "hide");
+                        .putString(VEHICLE, "auto").putString(HINT, "hide");
                 break;
             case "launcher":
                 // The apps are the point; the dash column goes away and
                 // the grid takes the room.
                 e.putString(DASH, "").putString(MEDIA, "compact")
                         .putString(DATE, "full").putString(LAYOUT, "grid")
-                        .putString(VEHICLE, "show").putString(HINT, "hide");
+                        .putString(VEHICLE, "auto").putString(HINT, "hide");
                 break;
             case "minimal":
                 // Clock, a speed, tiles. Calm motion to match.
                 e.putString(DASH, W_SPEEDO + ",").putString(GAUGE, "digits")
                         .putString(MEDIA, "hide").putString(DATE, "short")
-                        .putString(LAYOUT, "hero").putString(VEHICLE, "hide")
+                        .putString(LAYOUT, "hero").putString(VEHICLE, "off")
                         .putString(HINT, "hide").putString(MOTION, "calm");
                 break;
             default: // classic — the defaults

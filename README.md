@@ -78,7 +78,39 @@ Built for a Jancar / Rockchip RK3326 unit — Android 11, 32-bit — and kept ho
 | `ObdSource` | ELM327 Bluetooth dongle | RPM, speed, coolant, fuel level |
 | `JancarSource` | CAN box on the harness | Doors, boot, handbrake, reverse, fuel |
 
-OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where both report a field, the CAN box wins. `JancarSource` is wired but unverified against a real box: it logs every intent it receives under `CarDash/CAN` so the real keys can be dropped into the `KEY_*` constants.
+OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where both report a field, the CAN box wins. When OBD reports speed, the gauge prefers it over GPS (no lag under braking, no tunnel dropout). Fuel is remembered across restarts; doors are not.
+
+## Diagnostics
+
+Long-press the clock (or *Settings → Diagnostics*). It answers the questions you'd otherwise buy hardware to find out:
+
+- **Unit** — build fingerprint, the *claimed* Android version beside the *actual* API level (vendors overstate it), ABIs, and every package that looks like car integration.
+- **Vendor service surface** — the receivers, services and providers those packages declare, with their intent actions, read from their own manifests. A **manifest sweep** of every installed package finds the car service wherever a ROM has renamed it.
+- **Live broadcasts** — a sniffer armed on every action the sweep found, with each extra typed (`fuel=47 (Integer)`). Re-arms itself when discovery lands.
+- **Vehicle sources** — detected / started / last heard / fields known, per source: three failure modes that look identical on the home screen.
+- **OBD-II** — paired devices, which one matched, socket state, and the last raw reply per command, verbatim. Settles "this car has no fuel PID" versus "this clone dongle is lying".
+- **Key capture** — every key event with keycode, scancode and input device: what a steering-wheel button actually sends.
+- **Canbox protocol list** — typed by hand from the factory-settings menu; the one fact no API exposes and the one that decides which box to buy.
+- **Wireless Android Auto** — 5 GHz, Wi-Fi Direct, STA+AP concurrency (queryable exactly from API 30), Bluetooth, p2p interface, projection app versions. Tells you whether it's a settings problem, an app problem or a wall.
+- **Serial ports** — which UARTs exist.
+
+**Export** writes the whole report as plain text and hands it to any share target; **Copy** puts it on the clipboard. That file is what you give a canbox seller or a forum thread.
+
+### From adb
+
+Every probe is reachable from a shell, no screen needed — a `ContentProvider` that answers only the shell and root UIDs:
+
+```sh
+adb shell content query --uri content://ie.claudius.cardash.diag/unit
+adb shell content query --uri content://ie.claudius.cardash.diag/sweep
+adb shell content query --uri content://ie.claudius.cardash.diag/surface/com.jancar.services
+adb shell content query --uri content://ie.claudius.cardash.diag/aa
+adb shell content call  --uri content://ie.claudius.cardash.diag --method sniff --arg 15
+adb shell content call  --uri content://ie.claudius.cardash.diag --method obd --arg 20
+adb shell content call  --uri content://ie.claudius.cardash.diag --method set --arg speed_unit --extra value:s:mph
+```
+
+`content query --uri content://ie.claudius.cardash.diag/` lists everything.
 
 ## Install
 
