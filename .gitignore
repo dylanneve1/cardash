@@ -1,4 +1,5 @@
 build/
 *.keystore
 *.idsig
+cardash.apk
 tools/Roboto-*.ttf

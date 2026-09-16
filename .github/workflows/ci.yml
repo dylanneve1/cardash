@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Test, build, render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "build-tools;35.0.0 platforms;android-34"
+
+      - name: Unit tests (plain JVM)
+        run: ./test.sh
+
+      - name: Build APK
+        # A throwaway key: CI proves the build, it does not sign releases.
+        run: ./build.sh
+
+      - name: Check the APK is what the head unit needs
+        run: |
+          set -e
+          BT="$ANDROID_SDK_ROOT/build-tools/35.0.0"
+          "$BT/aapt2" dump badging cardash.apk | tee badging.txt
+          grep -q "targetSdkVersion:'30'" badging.txt
+          if unzip -l cardash.apk | grep -q 'lib/'; then
+            echo "::error::native code in the APK — this must run on a 32-bit unit"; exit 1
+          fi
+          test "$(stat -c %s cardash.apk)" -lt 1000000
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cardash-apk-unsigned-key
+          path: cardash.apk
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Render screenshots
+        run: |
+          pip install --quiet pillow numpy fonttools
+          python3 tools/render.py build/screenshots
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: build/screenshots
