@@ -2,6 +2,7 @@ package ie.claudius.cardash;
 
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
@@ -17,7 +18,7 @@ import android.graphics.drawable.Drawable;
  */
 public final class Glyph extends Drawable {
 
-    public enum Kind { PREV, PLAY, PAUSE, NEXT }
+    public enum Kind { PREV, PLAY, PAUSE, NEXT, GEAR }
 
     private final Kind kind;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -56,6 +57,9 @@ public final class Glyph extends Drawable {
                 canvas.drawRect(cx + s * 0.62f - bw, cy - s, cx + s * 0.62f,
                         cy + s, paint);
                 break;
+            case GEAR:
+                gear(cx, cy, s);
+                break;
             case PREV:
                 triangle(cx + s * 0.9f, cy, -s, s);
                 triangle(cx + s * 0.05f, cy, -s, s);
@@ -70,6 +74,27 @@ public final class Glyph extends Drawable {
                 break;
         }
         canvas.drawPath(path, paint);
+    }
+
+    /**
+     * Eight rounded teeth unioned onto a disc, with the hub punched out.
+     * Built with Path.op so the overlaps don't turn into even-odd holes.
+     */
+    private void gear(float cx, float cy, float s) {
+        path.addCircle(cx, cy, s * 0.68f, Path.Direction.CW);
+        Path tooth = new Path();
+        Matrix m = new Matrix();
+        for (int i = 0; i < 8; i++) {
+            tooth.reset();
+            tooth.addRoundRect(cx - s * 0.18f, cy - s, cx + s * 0.18f, cy - s * 0.5f,
+                    s * 0.09f, s * 0.09f, Path.Direction.CW);
+            m.setRotate(i * 45f, cx, cy);
+            tooth.transform(m);
+            path.op(tooth, Path.Op.UNION);
+        }
+        Path hub = new Path();
+        hub.addCircle(cx, cy, s * 0.28f, Path.Direction.CW);
+        path.op(hub, Path.Op.DIFFERENCE);
     }
 
     /** Triangle with its apex at (tipX ± width) and base at tipX. */

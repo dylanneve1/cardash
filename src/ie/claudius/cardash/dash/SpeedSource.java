@@ -44,7 +44,15 @@ public final class SpeedSource {
     public interface Listener {
         void onSpeed(float kph, boolean hasFix);
 
+        /** The first usable position only — enough to place the weather. */
         void onPosition(double lat, double lon);
+
+        /**
+         * Ground covered between two consecutive fixes, for the trip
+         * widget. Not called for the first fix or after a gap too long
+         * to say anything about the road in between.
+         */
+        void onTravel(float metres, long dtMs, float kph);
     }
 
     private final Context ctx;
@@ -149,6 +157,12 @@ public final class SpeedSource {
             // Only the very first fix, with nothing to compare against,
             // is genuinely unknown.
             known = true;
+        }
+        if (previous != null) {
+            long dt = l.getTime() - previous.getTime();
+            if (dt > 0 && dt <= STALE_MS) {
+                listener.onTravel(previous.distanceTo(l), dt, kph);
+            }
         }
         previous = l;
         listener.onSpeed(kph, known);

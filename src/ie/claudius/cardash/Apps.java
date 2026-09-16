@@ -30,7 +30,10 @@ public final class Apps {
 
     private static final String PREFS = "cardash";
     private static final String KEY_TILE = "tile_";
-    public static final int TILES = 7;
+    private static final String KEY_SEEDED = "seeded";
+    /** Enough for the widest layout (three columns, no hero); the
+     *  narrower ones show the first few. */
+    public static final int TILES = 12;
 
     /**
      * Sensible first-run tiles for a Jancar-based head unit, in priority
@@ -120,10 +123,34 @@ public final class Apps {
         prefs(ctx).edit().putString(KEY_TILE + index, pkg).apply();
     }
 
+    /** Forget every assignment and re-seed from PREFERRED. */
+    public static void reset(Context ctx) {
+        SharedPreferences.Editor e = prefs(ctx).edit();
+        for (int i = 0; i < TILES; i++) e.remove(KEY_TILE + i);
+        e.remove(KEY_SEEDED).apply();
+        seedIfEmpty(ctx);
+    }
+
+    /**
+     * The assigned packages and whether each still launches, joined —
+     * cheap change detection so the home screen only rebuilds when a
+     * tile was reassigned or an app came or went.
+     */
+    public static String signature(Context ctx) {
+        PackageManager pm = ctx.getPackageManager();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < TILES; i++) {
+            String pkg = tile(ctx, i);
+            sb.append(pkg).append(
+                    pkg != null && pm.getLaunchIntentForPackage(pkg) != null ? '+' : '-');
+        }
+        return sb.toString();
+    }
+
     /** First launch: pre-fill tiles with whatever of PREFERRED exists. */
     public static void seedIfEmpty(Context ctx) {
         SharedPreferences p = prefs(ctx);
-        if (p.getBoolean("seeded", false)) return;
+        if (p.getBoolean(KEY_SEEDED, false)) return;
 
         PackageManager pm = ctx.getPackageManager();
         List<String> chosen = new ArrayList<>(TILES);
@@ -144,6 +171,6 @@ public final class Apps {
         for (int i = 0; i < chosen.size(); i++) {
             e.putString(KEY_TILE + i, chosen.get(i));
         }
-        e.putBoolean("seeded", true).apply();
+        e.putBoolean(KEY_SEEDED, true).apply();
     }
 }

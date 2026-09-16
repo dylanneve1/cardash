@@ -25,6 +25,8 @@ public class Speedo extends View {
     private static final float START_ANGLE = 140f;
     private static final float SWEEP = 260f;
     private static final int MAX_KPH = 180;
+    private static final int MAX_MPH = 120;
+    private static final float KPH_PER_MPH = 1.609344f;
 
     private final Paint track = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint value = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -36,6 +38,9 @@ public class Speedo extends View {
     private float kph = 0f;
     private float shown = 0f;
     private boolean hasFix;
+    private boolean mph;
+    private int max = MAX_KPH;
+    private boolean digitsOnly;
 
     public Speedo(Context ctx) {
         super(ctx);
@@ -71,6 +76,25 @@ public class Speedo extends View {
         invalidate();
     }
 
+    /** Display unit only — the source always speaks km/h. */
+    public void setUnit(boolean useMph) {
+        mph = useMph;
+        if (max == MAX_KPH || max == MAX_MPH) max = useMph ? MAX_MPH : MAX_KPH;
+        invalidate();
+    }
+
+    /** Full-scale in the display unit; ticks fall every 20. */
+    public void setScale(int fullScale) {
+        max = Math.max(20, fullScale);
+        invalidate();
+    }
+
+    /** Just the number, bigger — for people who never look at the arc. */
+    public void setDigitsOnly(boolean digits) {
+        digitsOnly = digits;
+        invalidate();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         float w = getWidth(), h = getHeight();
@@ -87,22 +111,38 @@ public class Speedo extends View {
         float r = size / 2f - inset;
         arc.set(cx - r, cy - r, cx + r, cy + r);
 
-        canvas.drawArc(arc, START_ANGLE, SWEEP, false, track);
-
         // Ease toward the target so the needle doesn't twitch on every
         // GPS update; ~4 frames to settle, which reads as smooth without
         // feeling laggy.
         shown += (kph - shown) * 0.25f;
         if (Math.abs(kph - shown) < 0.2f) shown = kph;
 
-        float frac = Math.min(1f, shown / MAX_KPH);
-        if (frac > 0.001f) {
+        // The gauge is laid out in the display unit so the ticks land on
+        // round numbers whichever one is chosen.
+        float display = mph ? shown / KPH_PER_MPH : shown;
+
+        if (digitsOnly) {
+            number.setTextSize(size * 0.40f);
+            unit.setTextSize(size * 0.085f);
+            canvas.drawText(hasFix ? String.valueOf(Math.round(display)) : "--",
+                    cx, cy + size * 0.13f, number);
+            canvas.drawText(hasFix ? (mph ? "mph" : "km/h") : "no fix",
+                    cx, cy + size * 0.27f, unit);
+            if (shown != kph) postInvalidateOnAnimation();
+            return;
+        }
+
+        canvas.drawArc(arc, START_ANGLE, SWEEP, false, track);
+        float frac = Math.min(1f, display / max);
+        // No fix means no number, so no arc either — a confident bar
+        // beside "no fix" would be the gauge contradicting itself.
+        if (hasFix && frac > 0.001f) {
             canvas.drawArc(arc, START_ANGLE, SWEEP * frac, false, value);
         }
 
-        // Ticks every 20 km/h.
-        for (int k = 0; k <= MAX_KPH; k += 20) {
-            double a = Math.toRadians(START_ANGLE + SWEEP * (k / (float) MAX_KPH));
+        // Ticks every 20 units.
+        for (int k = 0; k <= max; k += 20) {
+            double a = Math.toRadians(START_ANGLE + SWEEP * (k / (float) max));
             float inner = r - stroke * 0.85f;
             float outer = r - stroke * 1.35f;
             canvas.drawLine(
@@ -114,12 +154,20 @@ public class Speedo extends View {
 
         number.setTextSize(size * 0.28f);
         unit.setTextSize(size * 0.072f);
-        String text = hasFix ? String.valueOf(Math.round(shown)) : "--";
+        String text = hasFix ? String.valueOf(Math.round(display)) : "--";
         canvas.drawText(text, cx, cy + size * 0.07f, number);
         // Keep the caption inside the ring: the arc's gap is at the
         // bottom and a longer string used to run straight through it.
-        canvas.drawText(hasFix ? "km/h" : "no fix",
+        canvas.drawText(hasFix ? (mph ? "mph" : "km/h") : "no fix",
                 cx, cy + size * 0.20f, unit);
+
+        // The card is taller than the dial; say where the number comes
+        // from in the room above it, when there is room.
+        float headroom = cy - r - stroke;
+        if (headroom > size * 0.12f) {
+            unit.setTextSize(size * 0.06f);
+            canvas.drawText("GPS", cx, headroom / 2f + unit.getTextSize() * 0.35f, unit);
+        }
 
         if (shown != kph) postInvalidateOnAnimation();
     }

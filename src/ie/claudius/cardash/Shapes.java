@@ -6,7 +6,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.animation.OvershootInterpolator;
 
 /**
  * Material 3 Expressive shape + motion.
@@ -43,6 +42,15 @@ public final class Shapes {
         return radii(density, new float[] { dp, dp, dp, dp }, fill);
     }
 
+    /** A filled circle with an optional ring — the theme swatches. */
+    public static Drawable dot(float density, int fill, int ring, float ringDp) {
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(fill);
+        if (ringDp > 0) d.setStroke(Math.round(ringDp * density), ring);
+        return d;
+    }
+
     private static GradientDrawable radii(float density, float[] dp, int fill) {
         GradientDrawable d = new GradientDrawable();
         d.setShape(GradientDrawable.RECTANGLE);
@@ -77,7 +85,7 @@ public final class Shapes {
                         break;
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
-                        scale(view, 1f, 320, new OvershootInterpolator(2.4f));
+                        scale(view, 1f, Motion.isCalm() ? 200 : 320, Motion.spring());
                         break;
                     default:
                         break;
