@@ -88,3 +88,7 @@ is usually a configuration problem.
   answers what arrives today.
 - The factory-settings protocol list has to be read off the unit's own
   menu; nothing programmatic exposes it.
+
+## Reporting a new car or head unit
+
+See CLAUDE.md, "Adding a new head unit or car": run the probe, follow the capture recipe, and attach the export to a "Support my head unit or car" issue. That's usually enough to write a source without having the car.

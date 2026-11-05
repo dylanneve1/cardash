@@ -14,4 +14,4 @@ body:
     attributes: {label: Canbox fitted?, options: ["Yes", "No", "Don't know"]}
   - type: textarea
     id: probe
-    attributes: {label: Diagnostics output, description: "Output of the diagnostics in tools/ (see docs/CAR-INTEGRATION.md, section 3). It shows what your unit exposes.", render: text}
+    attributes: {label: Diagnostics export, description: "Export from the Diagnostics screen, or the probe commands in CLAUDE.md (unit, sweep, sniff during the capture recipe).", render: text}
