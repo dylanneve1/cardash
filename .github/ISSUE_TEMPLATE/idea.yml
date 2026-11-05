@@ -1,0 +1,11 @@
+name: Feature idea
+description: Something CarDash should do
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes: {label: The idea, description: "What and why. How would you use it while driving?"}
+    validations: {required: true}
+  - type: textarea
+    id: extra
+    attributes: {label: Anything else, description: "Mockups, apps that do it well, links."}

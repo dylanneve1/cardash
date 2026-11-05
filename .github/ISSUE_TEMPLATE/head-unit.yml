@@ -1,0 +1,17 @@
+name: Support my head unit or car
+description: Get CarDash running (or reading CAN data) on your unit
+labels: [head-unit]
+body:
+  - type: input
+    id: unit
+    attributes: {label: Head unit, description: "Brand / ROM family (FYT, Jancar, TopWay, MTCD...), SoC, Android version and API level (Settings → About)"}
+    validations: {required: true}
+  - type: input
+    id: car
+    attributes: {label: Car, placeholder: "e.g. VW Polo 6R 2010"}
+  - type: dropdown
+    id: canbox
+    attributes: {label: Canbox fitted?, options: ["Yes", "No", "Don't know"]}
+  - type: textarea
+    id: probe
+    attributes: {label: Diagnostics output, description: "Output of the diagnostics in tools/ (see docs/CAR-INTEGRATION.md, section 3). It shows what your unit exposes.", render: text}

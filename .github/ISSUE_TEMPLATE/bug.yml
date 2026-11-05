@@ -1,0 +1,18 @@
+name: Bug report
+description: Something in CarDash is broken or looks wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes: {label: What happened, description: "What you did, what you expected, what you got. Screenshots help."}
+    validations: {required: true}
+  - type: input
+    id: unit
+    attributes: {label: Head unit, placeholder: "e.g. Jancar RK3326, Android 11 (API 30)"}
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes: {label: CarDash version or commit}
+  - type: textarea
+    id: logs
+    attributes: {label: Logs, description: "adb logcat -s CarDash:* CarDash/CAN:* (optional)", render: text}

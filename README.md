@@ -138,3 +138,7 @@ Needs an Android SDK with build-tools 35.0.0+ and platform 34 (`ANDROID_SDK_ROOT
 ## Licence
 
 Google Sans Flex is © The Google Sans Flex Authors, under the [SIL Open Font License 1.1](assets/fonts/OFL.txt).
+
+## Ideas, bugs, your head unit
+
+Open an issue (there are templates for bugs, feature ideas and support for another head unit or car) or start a [Discussion](https://github.com/dylanneve1/cardash/discussions). Once a week Claudius triages them and opens a pull request for one item; see [CONTRIBUTING.md](CONTRIBUTING.md).

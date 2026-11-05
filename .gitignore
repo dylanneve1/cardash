@@ -3,3 +3,4 @@ build/
 *.idsig
 cardash.apk
 tools/Roboto-*.ttf
+.DS_Store
