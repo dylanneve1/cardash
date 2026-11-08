@@ -116,6 +116,13 @@
     <string name="trip">Trip</string>
     <string name="trip_avg">avg</string>
     <string name="trip_hint">Hold to reset</string>
+    <string name="s_remote">Phone settings</string>
+    <string name="s_remote_caption">Change these from a phone on the same Wi-Fi or hotspot</string>
+    <string name="s_remote_off">Off</string>
+    <string name="s_remote_on">On</string>
+    <string name="s_remote_where">Open %1$s on your phone · code %2$s</string>
+    <string name="s_remote_nolan">On, waiting for Wi-Fi or a hotspot</string>
+    <string name="s_remote_locked">Locked after wrong codes. Turn off and on for a new code</string>
     <string name="s_hint">Tips</string>
     <string name="s_hint_caption">The long-press reminder under the clock</string>
     <string name="s_hint_show">Show</string>

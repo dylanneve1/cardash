@@ -30,6 +30,7 @@ import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.dash.Weather;
 import ie.claudius.cardash.diag.DiagnosticsActivity;
 import ie.claudius.cardash.media.NowPlaying;
+import ie.claudius.cardash.remote.RemoteServer;
 import ie.claudius.cardash.vehicle.VehicleHub;
 import ie.claudius.cardash.vehicle.VehicleState;
 
@@ -183,6 +184,14 @@ public class HomeActivity extends Activity {
         // A setting, the wallpaper, or the set of installed apps may
         // have changed while we were away.
         rebuildIfChanged();
+        // Phone settings (#1): a change from the LAN page shows at once.
+        RemoteServer.sync(this);
+        RemoteServer.setListener(new Runnable() {
+            @Override
+            public void run() {
+                rebuildIfChanged();
+            }
+        });
         // ...and the wallpaper's colours can land after we have already
         // resumed, if it was set a moment ago.
         themeWatch = ThemeWatch.start(this, new Runnable() {
@@ -205,6 +214,7 @@ public class HomeActivity extends Activity {
     protected void onPause() {
         super.onPause();
         Receivers.unregister(this, timeTick);
+        RemoteServer.setListener(null);
         ThemeWatch.stop(this, themeWatch);
         themeWatch = null;
         vehicle.stop(vehicleListener);

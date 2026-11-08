@@ -41,6 +41,8 @@ public final class Prefs {
     public static final String SCALE = "scale";       // auto | city | fast
     public static final String PRESET = "preset";     // classic | driver | launcher | minimal | ""
     /** Typed by hand from the factory settings menu; see DiagnosticsActivity. */
+    /** LAN settings page for a phone (issue #1); off until asked for. */
+    public static final String REMOTE = "remote";     // off | on
     public static final String CANBOX_PROTOCOLS = "canbox_protocols";
 
     public static final String W_SPEEDO = "speedo", W_TRIP = "trip", W_WEATHER = "weather";
@@ -179,6 +181,10 @@ public final class Prefs {
         StringBuilder sb = new StringBuilder();
         for (String w : DASH_ALL) if (now.contains(w)) sb.append(w).append(',');
         set(ctx, DASH, sb.toString());
+    }
+
+    public static boolean remoteOn(Context ctx) {
+        return "on".equals(get(ctx, REMOTE, "off"));
     }
 
     public static boolean digitsGauge(Context ctx) {
