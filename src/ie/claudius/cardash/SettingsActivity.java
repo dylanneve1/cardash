@@ -15,6 +15,7 @@ import android.widget.TextView;
 
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.diag.DiagnosticsActivity;
+import ie.claudius.cardash.remote.RemoteServer;
 
 /**
  * Settings, built the same way as everything else: in code, from the
@@ -54,6 +55,24 @@ public class SettingsActivity extends Activity {
                 if (Prefs.themeSeed(SettingsActivity.this) != builtSeed) rebuild(false);
             }
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // A phone on the LAN changed something: show it here too.
+        RemoteServer.setListener(new Runnable() {
+            @Override
+            public void run() {
+                rebuild(false);
+            }
+        });
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        RemoteServer.setListener(null);
     }
 
     @Override
@@ -194,6 +213,8 @@ public class SettingsActivity extends Activity {
                     }
                 }));
         card.addView(divider());
+        card.addView(remoteRow());
+        card.addView(divider());
         card.addView(linkRow(R.string.s_diag, R.string.s_diag_caption, R.string.s_diag_open,
                 new Intent(this, DiagnosticsActivity.class)));
         column.addView(card, cardParams(dp(16)));
@@ -296,6 +317,47 @@ public class SettingsActivity extends Activity {
                     handTuned();
                     style(opt, now);
                     Motion.pop(opt);
+                }
+            });
+            group.addView(opt);
+        }
+        row.addView(group);
+        return row;
+    }
+
+    /**
+     * "Phone settings": a LAN page for changing these from a phone (#1).
+     * The caption becomes the address and pairing code while it is on.
+     */
+    private View remoteRow() {
+        LinearLayout row = rowShell(R.string.s_remote, R.string.s_remote_caption);
+        if (Prefs.remoteOn(this)) {
+            TextView caption = (TextView) ((ViewGroup) row.getChildAt(0)).getChildAt(1);
+            String url = RemoteServer.address();
+            if (RemoteServer.locked()) {
+                caption.setText(R.string.s_remote_locked);
+            } else if (url == null) {
+                caption.setText(R.string.s_remote_nolan);
+            } else {
+                caption.setText(getString(R.string.s_remote_where, url, RemoteServer.code()));
+                caption.setTextColor(m3.onSurface());
+            }
+        }
+        LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.HORIZONTAL);
+        String[] values = { "off", "on" };
+        int[] labels = { R.string.s_remote_off, R.string.s_remote_on };
+        String current = Prefs.get(this, Prefs.REMOTE, "off");
+        for (int i = 0; i < values.length; i++) {
+            final String value = values[i];
+            TextView opt = pill(getString(labels[i]), value.equals(current));
+            opt.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (value.equals(Prefs.get(SettingsActivity.this, Prefs.REMOTE, "off"))) return;
+                    Prefs.set(SettingsActivity.this, Prefs.REMOTE, value);
+                    RemoteServer.sync(SettingsActivity.this);
+                    rebuild(false);
                 }
             });
             group.addView(opt);
