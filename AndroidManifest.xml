@@ -73,6 +73,12 @@
             android:screenOrientation="landscape"
             android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|uiMode"
             android:exported="false" />
+        <activity
+            android:name=".diag.ActivityLauncherActivity"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|uiMode"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false" />
         <!-- Diagnostics from adb via the `content` shell tool (see
              DiagProvider for the commands). Exported so the shell can
              reach it; the provider itself refuses every UID except

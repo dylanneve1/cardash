@@ -89,6 +89,8 @@ public class DiagnosticsActivity extends Activity {
     private TextView unitBody, surfaceBody, sniffBody, sourcesBody, obdBody, keysBody, serialBody, aaBody;
     private EditText protocolField;
 
+    private String targetsText = "";
+
     private final Log sniff = new Log();
     private final Log keys = new Log();
     private BroadcastReceiver sniffer;
@@ -206,6 +208,8 @@ public class DiagnosticsActivity extends Activity {
         surfaceBody = panel(column, R.string.diag_surface, R.string.diag_surface_caption, null);
         surfaceBody.setText(working);
 
+        launchEntry(column);
+
         sniffBody = panel(column, R.string.diag_sniffer, R.string.diag_sniffer_caption, sniff);
         sniff.body = sniffBody;
         sniff.idle = working;
@@ -285,6 +289,13 @@ public class DiagnosticsActivity extends Activity {
                 final String unitFull = unitText(ctx, all, hits.size());
                 final String surface = surfaceText(ctx, all);
                 final Set<String> actions = watchList(ctx, all);
+                final List<ActivityTargets.Target> exported = Probe.exportedActivities(ctx, null);
+                final String exportedText = Probe.activitiesText(exported);
+                post(new Runnable() {
+                    public void run() {
+                        targetsText = exportedText;
+                    }
+                });
                 post(new Runnable() {
                     public void run() {
                         vendorPkgs = all;
@@ -468,6 +479,23 @@ public class DiagnosticsActivity extends Activity {
         if (obdBody != null) obdBody.setText(obdText());
     }
 
+    // ---- launch any exported activity: its own screen --------------------------------
+
+    private void launchEntry(LinearLayout column) {
+        LinearLayout card = cardShell(column, R.string.diag_launch, R.string.diag_launch_caption, null);
+        TextView open = pill(getString(R.string.diag_launch_open), true, new Runnable() {
+            @Override
+            public void run() {
+                startActivity(new Intent(DiagnosticsActivity.this, ActivityLauncherActivity.class));
+            }
+        });
+        open.setMinHeight(dp(56));
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) open.getLayoutParams();
+        lp.topMargin = dp(12);
+        lp.leftMargin = 0;
+        card.addView(open, lp);
+    }
+
     // ---- the one fact that can't be probed ------------------------------------------
 
     /**
@@ -525,6 +553,8 @@ public class DiagnosticsActivity extends Activity {
         section(sb, "FACTORY-SETTINGS CANBOX PROTOCOL LIST (typed in by hand)",
                 protocols.isEmpty() ? "(not recorded yet)" : protocols);
         section(sb, "VENDOR SERVICE SURFACE", surfaceText);
+        section(sb, "EXPORTED ACTIVITIES (launchable from the Launch activities screen)",
+                targetsText.isEmpty() ? "(not read yet)" : targetsText);
         section(sb, "SNIFFED BROADCASTS (" + sniffActions.size() + " actions watched)",
                 sniff.joined() + "\nwatching:\n  " + joinLines(sniffActions).replace("\n", "\n  "));
         section(sb, "VEHICLE SOURCES", sourcesText());

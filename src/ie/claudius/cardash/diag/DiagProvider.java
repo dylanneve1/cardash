@@ -40,6 +40,7 @@ import ie.claudius.cardash.vehicle.VehicleState;
  *   adb shell content query --uri content://ie.claudius.cardash.diag/unit
  *   adb shell content query --uri content://ie.claudius.cardash.diag/sweep
  *   adb shell content query --uri content://ie.claudius.cardash.diag/surface/com.jancar.services
+ *   adb shell content query --uri content://ie.claudius.cardash.diag/activities[/<package>]   (exported activities; filter with ?q=engineer)
  *   adb shell content query --uri content://ie.claudius.cardash.diag/actions
  *   adb shell content query --uri content://ie.claudius.cardash.diag/aa        (wireless Android Auto checks)
  *   adb shell content query --uri content://ie.claudius.cardash.diag/serial
@@ -47,6 +48,8 @@ import ie.claudius.cardash.vehicle.VehicleState;
  *   adb shell content call  --uri content://ie.claudius.cardash.diag --method sniff --arg 15
  *   adb shell content call  --uri content://ie.claudius.cardash.diag --method sniff --arg 15 \
  *          --extra actions:s:com.foo.CAR_DATA,com.foo.DOOR
+ *   adb shell content call  --uri content://ie.claudius.cardash.diag --method launch --arg com.vendor.car/.FactoryActivity
+ *          (risky targets also need --extra confirm:s:yes)
  *   adb shell content call  --uri content://ie.claudius.cardash.diag --method sources --arg 5
  *   adb shell content call  --uri content://ie.claudius.cardash.diag --method obd --arg 20
  *   adb shell content call  --uri content://ie.claudius.cardash.diag --method set --arg speed_unit --extra value:s:mph
@@ -106,6 +109,12 @@ public final class DiagProvider extends ContentProvider {
             case "surface":
                 text = arg == null ? "usage: surface/<package>" : Probe.surface(ctx, arg);
                 break;
+            case "activities": {
+                List<ActivityTargets.Target> all = Probe.exportedActivities(ctx, arg);
+                text = Probe.activitiesText(
+                        ActivityTargets.filter(all, uri.getQueryParameter("q"), false));
+                break;
+            }
             case "actions":
                 text = lines(watchList(ctx, null));
                 break;
@@ -125,9 +134,9 @@ public final class DiagProvider extends ContentProvider {
                 break;
             }
             default:
-                text = "commands: unit | packages | sweep | surface/<pkg> | actions | aa | serial | prefs\n"
+                text = "commands: unit | packages | sweep | surface/<pkg> | activities[/<pkg>][?q=..] | actions | aa | serial | prefs\n"
                         + "calls:    sniff <seconds> [actions:s:a,b]  |  sources <seconds>  |  "
-                        + "obd <seconds>  |  set <key> value:s:<v>  |  get <key>\n"
+                        + "obd <seconds>  |  launch <pkg/Class> [confirm:s:yes]  |  set <key> value:s:<v>  |  get <key>\n"
                         + "e.g.      set canbox_protocols value:s:\"Raise, Hiworld\"  "
                         + "records the factory-settings list for the report";
         }
@@ -157,6 +166,24 @@ public final class DiagProvider extends ContentProvider {
             case "sources":
             case "obd": {
                 out.putString("report", probeSources(ctx, waitMs, "obd".equals(method)));
+                break;
+            }
+            case "launch": {
+                String[] parts = arg == null ? new String[0] : arg.split("/", 2);
+                if (parts.length != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
+                    out.putString("error", "usage: --method launch --arg <package>/<Class>");
+                    break;
+                }
+                String cls = parts[1].startsWith(".") ? parts[0] + parts[1] : parts[1];
+                String risk = ActivityTargets.risk(parts[0], cls);
+                boolean confirmed = extras != null && "yes".equals(extras.getString("confirm"));
+                if (risk != null && !confirmed) {
+                    out.putString("error", "RISKY: " + risk + " Repeat with --extra confirm:s:yes to launch.");
+                    break;
+                }
+                String err = Probe.launch(ctx, parts[0], cls);
+                if (err == null) out.putString("launched", parts[0] + "/" + cls);
+                else out.putString("error", err);
                 break;
             }
             case "set": {
