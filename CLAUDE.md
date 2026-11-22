@@ -31,7 +31,7 @@ adb shell content call  --uri $P --method sniff --arg 30   # live-capture car br
 adb shell content call  --uri $P --method sources --arg 5  # which vehicle sources are detected / heard
 adb shell content call  --uri $P --method obd --arg 20     # raw ELM327 replies, if a dongle is paired
 ```
-On a unit with no adb at all, the Diagnostics screen's **Launch activities** panel does the same on screen: every exported activity of every app (default: only those with no launcher icon), a filter box, and a Launch button that starts it by explicit component. Factory/engineer/modem/radio/RF/IMEI names and `com.mediatek.engineermode` ask for confirmation first. Rules live in `diag/ActivityTargets.java` (tested in `test/ActivityTargetsTest.java`).
+On a unit with no adb at all, the Diagnostics screen's **Launch activities…** row opens a screen (grouped by app, with icons) that does the same on screen: every exported activity of every app (default: only those with no launcher icon), a filter box, and a Launch button that starts it by explicit component. Factory/engineer/modem/radio/RF/IMEI names and `com.mediatek.engineermode` ask for confirmation first. Rules live in `diag/ActivityTargets.java` (tested in `test/ActivityTargetsTest.java`).
 
 The Diagnostics screen (long-press the clock, or Settings) shows the same, with a plain-text export.
 

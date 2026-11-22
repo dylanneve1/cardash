@@ -1,7 +1,6 @@
 package ie.claudius.cardash.diag;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -19,7 +18,6 @@ import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.inputmethod.EditorInfo;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -91,15 +89,7 @@ public class DiagnosticsActivity extends Activity {
     private TextView unitBody, surfaceBody, sniffBody, sourcesBody, obdBody, keysBody, serialBody, aaBody;
     private EditText protocolField;
 
-    // Launch panel: every exported activity, filtered, capped, big buttons.
-    private static final int MAX_LAUNCH_ROWS = 40;
-    private static final int WARN = 0xFFFFB4AB;
-    private List<ActivityTargets.Target> targets = new ArrayList<>();
     private String targetsText = "";
-    private boolean hiddenOnly = true;
-    private EditText launchFilter;
-    private TextView launchCount, hiddenPill;
-    private LinearLayout launchList;
 
     private final Log sniff = new Log();
     private final Log keys = new Log();
@@ -218,7 +208,7 @@ public class DiagnosticsActivity extends Activity {
         surfaceBody = panel(column, R.string.diag_surface, R.string.diag_surface_caption, null);
         surfaceBody.setText(working);
 
-        launchPanel(column);
+        launchEntry(column);
 
         sniffBody = panel(column, R.string.diag_sniffer, R.string.diag_sniffer_caption, sniff);
         sniff.body = sniffBody;
@@ -303,9 +293,7 @@ public class DiagnosticsActivity extends Activity {
                 final String exportedText = Probe.activitiesText(exported);
                 post(new Runnable() {
                     public void run() {
-                        targets = exported;
                         targetsText = exportedText;
-                        renderTargets();
                     }
                 });
                 post(new Runnable() {
@@ -491,184 +479,21 @@ public class DiagnosticsActivity extends Activity {
         if (obdBody != null) obdBody.setText(obdText());
     }
 
-    // ---- launch any exported activity -----------------------------------------------
+    // ---- launch any exported activity: its own screen --------------------------------
 
-    private void launchPanel(LinearLayout column) {
+    private void launchEntry(LinearLayout column) {
         LinearLayout card = cardShell(column, R.string.diag_launch, R.string.diag_launch_caption, null);
-
-        LinearLayout bar = new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        launchFilter = new EditText(this);
-        launchFilter.setSingleLine(true);
-        launchFilter.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        launchFilter.setTextSize(16);
-        launchFilter.setMinHeight(dp(56));
-        launchFilter.setTextColor(m3.onSurface());
-        launchFilter.setHintTextColor(M3.withAlpha(m3.onSurfaceVariant(), 0x99));
-        launchFilter.setHint(R.string.diag_launch_filter_hint);
-        launchFilter.setBackground(Shapes.round(density, m3.surfaceContainerHigh(), 16));
-        launchFilter.setPadding(dp(16), dp(8), dp(16), dp(8));
-        launchFilter.addTextChangedListener(new TextWatcher() {
-            public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            public void onTextChanged(CharSequence s, int a, int b, int c) {}
-            public void afterTextChanged(Editable s) {
-                main.removeCallbacks(rerenderTargets);
-                main.postDelayed(rerenderTargets, 150);
-            }
-        });
-        bar.addView(launchFilter, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        hiddenPill = pill(getString(R.string.diag_launch_hidden), hiddenOnly, new Runnable() {
+        TextView open = pill(getString(R.string.diag_launch_open), true, new Runnable() {
             @Override
             public void run() {
-                hiddenOnly = !hiddenOnly;
-                style(hiddenPill, hiddenOnly);
-                renderTargets();
+                startActivity(new Intent(DiagnosticsActivity.this, ActivityLauncherActivity.class));
             }
         });
-        hiddenPill.setMinHeight(dp(56));
-        LinearLayout.LayoutParams plp = (LinearLayout.LayoutParams) hiddenPill.getLayoutParams();
-        plp.leftMargin = dp(10);
-        bar.addView(hiddenPill, plp);
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.topMargin = dp(12);
-        card.addView(bar, blp);
-
-        launchCount = new TextView(this);
-        launchCount.setTypeface(Fonts.body(this));
-        launchCount.setTextColor(m3.onSurfaceVariant());
-        launchCount.setTextSize(13);
-        launchCount.setText(R.string.diag_working);
-        launchCount.setPadding(dp(4), dp(10), 0, dp(6));
-        card.addView(launchCount);
-
-        launchList = new LinearLayout(this);
-        launchList.setOrientation(LinearLayout.VERTICAL);
-        card.addView(launchList);
-    }
-
-    private final Runnable rerenderTargets = new Runnable() {
-        @Override
-        public void run() {
-            renderTargets();
-        }
-    };
-
-    private void renderTargets() {
-        if (launchList == null) return;
-        launchList.removeAllViews();
-        List<ActivityTargets.Target> shown = ActivityTargets.filter(targets,
-                launchFilter.getText().toString(), hiddenOnly);
-        Set<String> apps = new LinkedHashSet<>();
-        for (ActivityTargets.Target t : shown) apps.add(t.pkg);
-        launchCount.setText(shown.isEmpty() ? getString(R.string.diag_launch_none)
-                : getString(R.string.diag_launch_count, Math.min(shown.size(), MAX_LAUNCH_ROWS),
-                shown.size(), apps.size()));
-        // Risky ones last within the cap would hide the useful ones; keep manifest order.
-        for (int i = 0; i < shown.size() && i < MAX_LAUNCH_ROWS; i++) {
-            launchList.addView(launchRow(shown.get(i)));
-        }
-        if (shown.size() > MAX_LAUNCH_ROWS) {
-            TextView more = new TextView(this);
-            more.setTypeface(Fonts.body(this));
-            more.setTextColor(m3.onSurfaceVariant());
-            more.setTextSize(14);
-            more.setPadding(dp(4), dp(10), 0, dp(4));
-            more.setText(getString(R.string.diag_launch_more, shown.size() - MAX_LAUNCH_ROWS));
-            launchList.addView(more);
-        }
-    }
-
-    /** One activity: names on the left, a big Launch button on the right, errors underneath. */
-    private View launchRow(final ActivityTargets.Target t) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setMinimumHeight(dp(72));
-        row.setBackground(Shapes.round(density, m3.surfaceContainerHigh(), 16));
-        row.setPadding(dp(18), dp(8), dp(10), dp(8));
-
-        LinearLayout text = new LinearLayout(this);
-        text.setOrientation(LinearLayout.VERTICAL);
-        TextView name = new TextView(this);
-        name.setText(t.shortName());
-        name.setTypeface(Fonts.display(this));
-        name.setTextColor(m3.onSurface());
-        name.setTextSize(16);
-        text.addView(name);
-        TextView pkg = new TextView(this);
-        pkg.setText(t.pkg + (t.launcher ? "" : "  ·  no icon"));
-        pkg.setTypeface(Typeface.MONOSPACE);
-        pkg.setTextColor(m3.onSurfaceVariant());
-        pkg.setTextSize(12);
-        text.addView(pkg);
-        if (t.risk != null) {
-            TextView warn = new TextView(this);
-            warn.setText(R.string.diag_launch_risky_tag);
-            warn.setTextColor(WARN);
-            warn.setTextSize(13);
-            text.addView(warn);
-        }
-        if (t.permission != null) {
-            TextView need = new TextView(this);
-            need.setText(getString(R.string.diag_launch_needs, t.permission));
-            need.setTextColor(m3.onSurfaceVariant());
-            need.setTextSize(12);
-            text.addView(need);
-        }
-        final TextView error = new TextView(this);
-        error.setTextColor(WARN);
-        error.setTextSize(13);
-        error.setVisibility(View.GONE);
-        text.addView(error);
-        row.addView(text, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        TextView go = pill(getString(R.string.diag_launch_button), true, new Runnable() {
-            @Override
-            public void run() {
-                if (t.risk == null) {
-                    launchNow(t, error);
-                } else {
-                    confirmRisky(t, error);
-                }
-            }
-        });
-        go.setMinHeight(dp(56));
-        go.setMinWidth(dp(120));
-        row.addView(go);
-
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.bottomMargin = dp(8);
-        row.setLayoutParams(lp);
-        return row;
-    }
-
-    private void confirmRisky(final ActivityTargets.Target t, final TextView error) {
-        if (isFinishing()) return;
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle("⚠ " + getString(R.string.diag_launch_risky_title))
-                .setMessage(t.risk + "\n\n" + t.flat())
-                .setNegativeButton(R.string.diag_launch_cancel, null)
-                .setPositiveButton(R.string.diag_launch_anyway, new android.content.DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(android.content.DialogInterface d, int which) {
-                        launchNow(t, error);
-                    }
-                })
-                .show();
-    }
-
-    /** startActivity with an explicit component; any failure lands on the row, never as a crash. */
-    private void launchNow(ActivityTargets.Target t, TextView error) {
-        String err = Probe.launch(this, t.pkg, t.name);
-        if (err == null) {
-            error.setVisibility(View.GONE);
-        } else {
-            error.setText(err);
-            error.setVisibility(View.VISIBLE);
-        }
+        open.setMinHeight(dp(56));
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) open.getLayoutParams();
+        lp.topMargin = dp(12);
+        lp.leftMargin = 0;
+        card.addView(open, lp);
     }
 
     // ---- the one fact that can't be probed ------------------------------------------
@@ -728,7 +553,7 @@ public class DiagnosticsActivity extends Activity {
         section(sb, "FACTORY-SETTINGS CANBOX PROTOCOL LIST (typed in by hand)",
                 protocols.isEmpty() ? "(not recorded yet)" : protocols);
         section(sb, "VENDOR SERVICE SURFACE", surfaceText);
-        section(sb, "EXPORTED ACTIVITIES (launchable from the Launch panel)",
+        section(sb, "EXPORTED ACTIVITIES (launchable from the Launch activities screen)",
                 targetsText.isEmpty() ? "(not read yet)" : targetsText);
         section(sb, "SNIFFED BROADCASTS (" + sniffActions.size() + " actions watched)",
                 sniff.joined() + "\nwatching:\n  " + joinLines(sniffActions).replace("\n", "\n  "));
