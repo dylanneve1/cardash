@@ -16,8 +16,10 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
+import ie.claudius.cardash.Apps;
 import ie.claudius.cardash.Prefs;
 
 /**
@@ -148,6 +150,11 @@ public final class RemoteServer {
                     if (l != null) l.run();
                 }
             });
+        }
+
+        @Override
+        public List<String[]> apps() {
+            return Apps.labels(app);
         }
     };
 

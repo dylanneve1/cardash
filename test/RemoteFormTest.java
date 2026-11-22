@@ -3,7 +3,9 @@ import ie.claudius.cardash.remote.RemoteForm;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,6 +31,13 @@ public class RemoteFormTest {
         public void apply(Map<String, String> changes) {
             applies++;
             m.putAll(changes);
+        }
+
+        public List<String[]> apps() {
+            List<String[]> a = new ArrayList<>();
+            a.add(new String[] { "com.example.maps", "Maps" });
+            a.add(new String[] { "com.example.music", "Music & <Radio>" });
+            return a;
         }
     }
 
@@ -120,6 +129,37 @@ public class RemoteFormTest {
         // All dash widgets off: only the marker arrives.
         s.handle(req(post("/", cookie, "dash_present=1")), store);
         check("dash all off", "".equals(store.m.get("dash")));
+
+        // Tiles: only as many dropdowns as the dash shows, labels escaped.
+        store.m.put("dash", "speedo,");
+        store.m.put("layout", "hero");
+        store.m.put("tile_0", "com.example.maps");
+        store.m.put("tile_2", "com.gone.app");
+        r = s.handle(req(get("/", cookie)), store);
+        check("tiles shown", r.contains("name=tile_6 ") && !r.contains("name=tile_7 "));
+        check("tile selected", r.contains("value=\"com.example.maps\" selected>Maps"));
+        check("tile label escaped", r.contains("Music &amp; &lt;Radio&gt;"));
+        check("uninstalled kept", r.contains("value=\"com.gone.app\" selected>com.gone.app (not installed)"));
+        check("empty selected", r.contains("<select name=tile_1 id=t1><option value=\"\" selected>Empty"));
+        check("visible counts", RemoteForm.visibleTiles(true, true) == 7 && RemoteForm.visibleTiles(true, false) == 8
+                && RemoteForm.visibleTiles(false, true) == 10 && RemoteForm.visibleTiles(false, false) == 12);
+
+        int before = store.applies;
+        store.m.put("preset", "driver");
+        s.handle(req(post("/", cookie, "tile_0=com.example.maps&tile_1=com.example.music"
+                + "&tile_2=com.gone.app&tile_3=com.evil%3Bx&tile_4=&tile_12=com.example.maps"
+                + "&tile_-1=com.example.maps")), store);
+        check("tile written", "com.example.music".equals(store.m.get("tile_1")));
+        check("unknown package dropped", !store.m.containsKey("tile_3"));
+        check("empty unchanged no write", !store.m.containsKey("tile_4"));
+        check("uninstalled untouched", "com.gone.app".equals(store.m.get("tile_2")));
+        check("out-of-range slots dropped",
+                !store.m.containsKey("tile_12") && !store.m.containsKey("tile_-1"));
+        check("tile change keeps preset", "driver".equals(store.m.get("preset")) && store.applies == before + 1);
+        s.handle(req(post("/", cookie, "tile_0=")), store);
+        check("tile cleared", "".equals(store.m.get("tile_0")));
+        s.handle(req(post("/", cookie, "tile_0=&tile_1=com.example.music")), store);
+        check("tiles unchanged no apply", store.applies == before + 2);
 
         // Lockout: five wrong codes and even the right one stops working.
         RemoteForm.Session t = new RemoteForm.Session(new SecureRandom());

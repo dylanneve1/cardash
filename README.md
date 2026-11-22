@@ -82,7 +82,7 @@ OBD-II has no PID for door state — that lives on the body bus — so doors nee
 
 ## Phone settings
 
-*Settings → Phone settings → On* serves a small settings page on the local network (the head unit usually sits on the phone's hotspot). The row shows the address and a 6-digit code: open it on the phone, enter the code once, and change the dash widgets, layout and units from there. LAN only, off by default, five wrong codes lock it until it is switched off and on.
+*Settings → Phone settings → On* serves a small settings page on the local network (the head unit usually sits on the phone's hotspot). The row shows the address, a QR code of it and a 6-digit pairing code: scan it (or type the address) on the phone, enter the code once, and change the dash widgets, layout and units from there. LAN only, off by default, five wrong codes lock it until it is switched off and on.
 
 ## Diagnostics
 
@@ -131,7 +131,7 @@ Settings → Apps → Default apps → Home app. The stock launcher stays instal
 
 ```sh
 ./build.sh      # -> cardash.apk
-./test.sh       # plain-JVM tests for the OBD parser
+./test.sh       # plain-JVM tests: OBD parser, phone settings page, QR encoder
 ```
 
 Needs an Android SDK with build-tools 35.0.0+ and platform 34 (`ANDROID_SDK_ROOT` if it isn't in the default place). The script generates a debug keystore on first run; use your own for anything you hand to other people.
