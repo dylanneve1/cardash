@@ -82,6 +82,35 @@ public final class Apps {
         return out;
     }
 
+    /**
+     * {package, label} of every launchable app, sorted by label. Like
+     * {@link #launchable} but without loading icons, for the phone
+     * settings page, which only needs names.
+     */
+    public static List<String[]> labels(Context ctx) {
+        PackageManager pm = ctx.getPackageManager();
+        Intent main = new Intent(Intent.ACTION_MAIN, null);
+        main.addCategory(Intent.CATEGORY_LAUNCHER);
+        String self = ctx.getPackageName();
+        List<String[]> out = new ArrayList<>();
+        List<String> seen = new ArrayList<>();
+        for (ResolveInfo ri : pm.queryIntentActivities(main, 0)) {
+            String pkg = ri.activityInfo.packageName;
+            if (self.equals(pkg) || seen.contains(pkg)) continue;
+            seen.add(pkg);
+            CharSequence label = ri.loadLabel(pm);
+            out.add(new String[] { pkg, label == null ? pkg : label.toString() });
+        }
+        final Collator collator = Collator.getInstance();
+        Collections.sort(out, new Comparator<String[]>() {
+            @Override
+            public int compare(String[] a, String[] b) {
+                return collator.compare(a[1], b[1]);
+            }
+        });
+        return out;
+    }
+
     public static Entry byPackage(Context ctx, String pkg) {
         if (pkg == null) return null;
         PackageManager pm = ctx.getPackageManager();

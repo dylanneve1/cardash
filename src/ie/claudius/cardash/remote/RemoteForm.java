@@ -99,6 +99,26 @@ public final class RemoteForm {
 
         /** Write all of these at once, then tell the dash. */
         void apply(Map<String, String> changes);
+
+        /** Launchable apps as {package, label}, sorted by label: the only
+         *  values a tile may be set to (besides empty). */
+        List<String[]> apps();
+    }
+
+    // ---- tiles -------------------------------------------------------------------
+
+    /** Same keys as Apps.tile(): tile_0 .. tile_11. */
+    static final String TILE = "tile_";
+    static final int TILES = 12;
+
+    /**
+     * How many tiles the home screen shows, mirroring HomeActivity.spans:
+     * four rows, two columns beside the dash or three without it, and in
+     * the hero layout the top row is one wide tile.
+     */
+    public static int visibleTiles(boolean dash, boolean hero) {
+        int columns = dash ? 2 : 3, rows = 4;
+        return Math.min(TILES, hero ? 1 + columns * (rows - 1) : columns * rows);
     }
 
     /**
@@ -127,6 +147,24 @@ public final class RemoteForm {
             }
         }
         if (widget) out.put(PRESET, "");
+        // Tiles: a package must be one the unit can launch right now, or
+        // empty. Anything else (a typo, a package that isn't installed, a
+        // crafted value) is dropped, so the page can't plant an arbitrary
+        // string the launcher would later try to start.
+        List<String[]> apps = null;
+        for (int i = 0; i < TILES; i++) {
+            String v = form.get(TILE + i);
+            if (v == null) continue;
+            if (!v.isEmpty()) {
+                if (apps == null) apps = store.apps();
+                boolean ok = false;
+                for (String[] a : apps) ok |= a[0].equals(v);
+                if (!ok) continue;
+            }
+            String cur = store.get(TILE + i, null);
+            if (v.equals(cur == null ? "" : cur)) continue;
+            out.put(TILE + i, v);
+        }
         return out;
     }
 
@@ -342,6 +380,9 @@ public final class RemoteForm {
             + "input.code{width:100%;box-sizing:border-box;min-height:56px;font-size:28px;"
             + "letter-spacing:8px;text-align:center;border-radius:16px;border:0;"
             + "background:#2e3136;color:#e2e2e9;margin:0 0 16px}"
+            + "label.tile{display:block;margin:10px 0 6px;color:#c4c6d0}"
+            + "select{width:100%;min-height:52px;border:0;border-radius:16px;padding:0 14px;"
+            + "background:#2e3136;color:#e2e2e9;font:inherit;margin:0 0 4px}"
             + "p{color:#c4c6d0}.ok{color:#9dd49a}.err{color:#ffb4ab}";
 
     static String page(String title, String body) {
@@ -361,6 +402,42 @@ public final class RemoteForm {
                         + "inputmode=numeric autocomplete=one-time-code maxlength=6 "
                         + "pattern=\"[0-9]{6}\" required autofocus>"
                         + "<button>Pair</button></form>");
+    }
+
+    /** One dropdown per tile the home screen currently shows. */
+    static void tiles(Store store, StringBuilder sb) {
+        boolean dash = !normaliseDash(store.get(DASH, DASH_DEFAULT)).isEmpty();
+        boolean hero = "hero".equals(store.get("layout", "hero"));
+        int n = visibleTiles(dash, hero);
+        List<String[]> apps = store.apps();
+        sb.append("<section><fieldset><legend>Tiles</legend>")
+                .append("<p>In order: left to right, top to bottom")
+                .append(hero ? "; tile 1 is the wide one" : "")
+                .append(". Long-pressing a tile on the dash does the same.</p>");
+        for (int i = 0; i < n; i++) {
+            String cur = store.get(TILE + i, null);
+            if (cur == null) cur = "";
+            boolean known = cur.isEmpty();
+            sb.append("<label class=tile for=t").append(i).append(">Tile ").append(i + 1)
+                    .append("</label><select name=").append(TILE).append(i)
+                    .append(" id=t").append(i).append("><option value=\"\"")
+                    .append(cur.isEmpty() ? " selected" : "").append(">Empty</option>");
+            for (String[] a : apps) {
+                boolean sel = a[0].equals(cur);
+                known |= sel;
+                sb.append("<option value=\"").append(esc(a[0])).append('"')
+                        .append(sel ? " selected" : "").append('>').append(esc(a[1]))
+                        .append("</option>");
+            }
+            // An app that has since been uninstalled: keep it selected so
+            // saving something else doesn't silently clear this tile.
+            if (!known) {
+                sb.append("<option value=\"").append(esc(cur)).append("\" selected>")
+                        .append(esc(cur)).append(" (not installed)</option>");
+            }
+            sb.append("</select>");
+        }
+        sb.append("</fieldset></section>");
     }
 
     static String settingsPage(Store store, boolean saved) {
@@ -393,7 +470,9 @@ public final class RemoteForm {
             }
             sb.append("</div></fieldset>");
         }
-        sb.append("</section><button>Save</button></form>");
+        sb.append("</section>");
+        tiles(store, sb);
+        sb.append("<button>Save</button></form>");
         return page("CarDash settings", sb.toString());
     }
 }

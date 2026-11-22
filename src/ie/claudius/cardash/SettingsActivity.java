@@ -15,6 +15,7 @@ import android.widget.TextView;
 
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.diag.DiagnosticsActivity;
+import ie.claudius.cardash.remote.QrView;
 import ie.claudius.cardash.remote.RemoteServer;
 
 /**
@@ -327,7 +328,8 @@ public class SettingsActivity extends Activity {
 
     /**
      * "Phone settings": a LAN page for changing these from a phone (#1).
-     * The caption becomes the address and pairing code while it is on.
+     * The caption becomes the address and pairing code while it is on,
+     * with a QR code of the address under it so nobody types an IP.
      */
     private View remoteRow() {
         LinearLayout row = rowShell(R.string.s_remote, R.string.s_remote_caption);
@@ -341,6 +343,12 @@ public class SettingsActivity extends Activity {
             } else {
                 caption.setText(getString(R.string.s_remote_where, url, RemoteServer.code()));
                 caption.setTextColor(m3.onSurface());
+                QrView qr = new QrView(this);
+                if (qr.set(url, m3.surface(), m3.onSurface(), dp(12))) {
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(148), dp(148));
+                    lp.topMargin = dp(12);
+                    ((ViewGroup) row.getChildAt(0)).addView(qr, lp);
+                }
             }
         }
         LinearLayout group = new LinearLayout(this);
