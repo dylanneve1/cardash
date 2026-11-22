@@ -1005,8 +1005,9 @@ public class HomeActivity extends Activity {
     private void updateClock() {
         if (clock == null) return;
         Date now = new Date();
-        Motion.swapText(clock, new SimpleDateFormat(
-                Prefs.clockPattern(this), Locale.getDefault()).format(now));
+        // No fade on the clock: at full-column size the minute's fade-out/fade-in reads as a flash.
+        String time = new SimpleDateFormat(Prefs.clockPattern(this), Locale.getDefault()).format(now);
+        if (!time.contentEquals(clock.getText())) clock.setText(time);
         String datePattern = Prefs.datePattern(this);
         if (datePattern != null) {
             Motion.swapText(date, new SimpleDateFormat(datePattern, Locale.getDefault()).format(now));
