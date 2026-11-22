@@ -466,18 +466,52 @@ def home(design, apps, chips, path, **over):
              + (dp(18) + np_h if np_h else 0)
              + (dp(16) + chip_h if show_chips else 0)
              + (dp(14) + f_hint.height if c["hint"] else 0))
+    # HomeActivity.fitClock: the clock takes the largest size (72..220 sp)
+    # whose "88:88" fits the card width and whose line box fits the height
+    # left by the rest of the column; the date follows at 25% (18..30 sp,
+    # also shrunk to fit the width, min 14).
+    others = block - f_clock.height
+    avail_w = right - cx
+    avail_h = (ly1 - ly0 - 2 * dp(24)) - others
+    probe = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    def clock_ok(sz):
+        f = Face("hero", sz, padding=False)
+        w = sum(f.width(probe, ch) - 0.03 * sp(sz) for ch in "88:88") + 0.03 * sp(sz)
+        return w <= avail_w and f.height <= avail_h
+    lo, hi = 72.0, 220.0
+    if clock_ok(hi):
+        lo = hi
+    elif clock_ok(lo):
+        for _ in range(20):
+            mid = (lo + hi) / 2
+            if clock_ok(mid):
+                lo = mid
+            else:
+                hi = mid
+    clock_sp = lo
+    date_txt = "Tuesday 15 September" if c["date"] == "full" else "Tue 15 Sep"
+    date_sp = min(30.0, max(18.0, clock_sp * 0.25))
+    while date_sp > 14 and Face("body", date_sp, padding=False).width(probe, date_txt) > avail_w:
+        date_sp -= 0.5
+    f_clock = Face("hero", clock_sp, padding=False)
+    f_date = Face("body", date_sp, padding=False)
+    block = (f_clock.height
+             + (dp(10) + f_date.height + dp(20) if show_date else dp(20))
+             + actions_h
+             + (dp(18) + np_h if np_h else 0)
+             + (dp(16) + chip_h if show_chips else 0)
+             + (dp(14) + f_hint.height if c["hint"] else 0))
     y = ly0 + dp(24) + ((ly1 - ly0 - 2 * dp(24)) - block) // 2
 
     # setLetterSpacing(-0.03f) on the clock: nudge glyphs together.
     x = cx
     for ch in c["clock"]:
         f_clock.draw(d, (x, y), ch, p["primary"])
-        x += f_clock.width(d, ch) - 0.03 * sp(72)
+        x += f_clock.width(d, ch) - 0.03 * sp(clock_sp)
     y += f_clock.height
     if show_date:
         y += dp(10)
-        f_date.draw(d, (cx, y), "Tuesday 15 September" if c["date"] == "full" else "Tue 15 Sep",
-                    p["onSurfaceVariant"])
+        f_date.draw(d, (cx, y), date_txt, p["onSurfaceVariant"])
         y += f_date.height
     y += dp(20)
 
