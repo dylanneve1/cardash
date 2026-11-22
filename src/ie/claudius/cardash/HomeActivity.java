@@ -60,6 +60,7 @@ public class HomeActivity extends Activity {
     private Object themeWatch;
 
     private TextView clock, date;
+    private LinearLayout clockPanel;
     private LinearLayout vehicleBar;
     private final Map<String, TextView> chips = new HashMap<>();
     private final VehicleHub vehicle = VehicleHub.shared();
@@ -344,6 +345,16 @@ public class HomeActivity extends Activity {
             clock.setPadding(0, 0, 0, dp(20));
         }
         panel.addView(date);
+
+        // The clock is the headline: grow it to the column's width.
+        clockPanel = panel;
+        panel.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int l, int t, int r, int b,
+                                       int ol, int ot, int or, int ob) {
+                if (r - l != or - ol || b - t != ob - ot) fitClock();
+            }
+        });
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -927,6 +938,58 @@ public class HomeActivity extends Activity {
         }
     }
 
+    /**
+     * Pick the largest clock size whose widest possible reading ("88:88"
+     * in the widest digit) fits the panel's inner width, so the size
+     * does not jump from minute to minute, capped by panel height so it
+     * never crowds out the buttons below. No TextView autosize before
+     * API 26, so measure with a Paint copy. The date follows at a
+     * quarter of the clock size, shrunk if the text would not fit.
+     */
+    private void fitClock() {
+        if (clock == null || clockPanel == null) return;
+        int availW = clockPanel.getWidth() - clockPanel.getPaddingLeft() - clockPanel.getPaddingRight();
+        int availH = clockPanel.getHeight() - clockPanel.getPaddingTop() - clockPanel.getPaddingBottom();
+        if (availW <= 0 || availH <= 0) return;
+        float sp = getResources().getDisplayMetrics().scaledDensity;
+
+        android.graphics.Paint p = new android.graphics.Paint(clock.getPaint());
+        float probe = 100f;
+        p.setTextSize(probe);
+        char widest = '0';
+        float wd = 0f;
+        for (char c = '0'; c <= '9'; c++) {
+            float w = p.measureText(String.valueOf(c));
+            if (w > wd) {
+                wd = w;
+                widest = c;
+            }
+        }
+        String sample = "" + widest + widest + ":" + widest + widest; // two hour digits at worst
+        float perPx = p.measureText(sample) / probe;
+        float px = availW / perPx;
+        // Height: the digits are ~0.72 em tall; keep the clock under ~40 % of the column.
+        px = Math.min(px, availH * 0.40f / 0.72f);
+        px = Math.max(px, 24f * sp);
+        if (Math.abs(px - clock.getTextSize()) > 0.5f) {
+            clock.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px);
+        }
+
+        if (date != null && date.getVisibility() == View.VISIBLE) {
+            float dpx = Math.min(Math.max(px * 0.25f, 18f * sp), 32f * sp);
+            android.graphics.Paint dp = new android.graphics.Paint(date.getPaint());
+            CharSequence text = date.getText();
+            while (text.length() > 0 && dpx > 18f * sp) {
+                dp.setTextSize(dpx);
+                if (dp.measureText(text.toString()) <= availW) break;
+                dpx -= sp;
+            }
+            if (Math.abs(dpx - date.getTextSize()) > 0.5f) {
+                date.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, dpx);
+            }
+        }
+    }
+
     private void updateClock() {
         if (clock == null) return;
         Date now = new Date();
@@ -934,7 +997,16 @@ public class HomeActivity extends Activity {
                 Prefs.clockPattern(this), Locale.getDefault()).format(now));
         String datePattern = Prefs.datePattern(this);
         if (datePattern != null) {
-            Motion.swapText(date, new SimpleDateFormat(datePattern, Locale.getDefault()).format(now));
+            String dateText = new SimpleDateFormat(datePattern, Locale.getDefault()).format(now);
+            boolean changed = !dateText.contentEquals(date.getText());
+            Motion.swapText(date, dateText);
+            // The new text lands after the swap animation; refit then.
+            if (changed && clockPanel != null) clockPanel.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    fitClock();
+                }
+            }, 400);
         }
     }
 
