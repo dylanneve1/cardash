@@ -332,6 +332,14 @@ public class HomeActivity extends Activity {
             }
         });
         panel.addView(clock);
+        // The clock fills its card: re-fit whenever the panel is laid out.
+        panel.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int l, int t, int r, int b,
+                                       int ol, int ot, int or, int ob) {
+                fitClock((LinearLayout) v);
+            }
+        });
 
         date = new TextView(this);
         date.setIncludeFontPadding(false);
@@ -407,6 +415,15 @@ public class HomeActivity extends Activity {
         Motion.animateChildren(vehicleBar);
         chipScroll.addView(vehicleBar);
         if (Prefs.showVehicle(this)) panel.addView(chipScroll);
+        // The strip appearing takes height from the clock: re-fit.
+        final LinearLayout fitPanel = panel;
+        chipScroll.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int l, int t, int r, int b,
+                                       int ol, int ot, int or, int ob) {
+                if (b - t != ob - ot) fitClock(fitPanel);
+            }
+        });
 
         if (Prefs.showHint(this)) {
             TextView hint = new TextView(this);
@@ -927,6 +944,64 @@ public class HomeActivity extends Activity {
         }
     }
 
+    private float lastClockPx, lastDatePx;
+
+    /**
+     * Largest clock size whose widest time ("88:88") fits the card width and
+     * whose height leaves room for everything else in the column. Manual
+     * Paint measuring: TextView autosize needs API 26, minSdk is 21.
+     */
+    private void fitClock(LinearLayout panel) {
+        if (clock == null || date == null) return;
+        int w = panel.getWidth() - panel.getPaddingLeft() - panel.getPaddingRight();
+        int h = panel.getHeight() - panel.getPaddingTop() - panel.getPaddingBottom();
+        if (w <= 0) return;
+        // Height left for the clock = column minus every other child.
+        int others = 0;
+        for (int i = 0; i < panel.getChildCount(); i++) {
+            View c = panel.getChildAt(i);
+            if (c == clock || c.getVisibility() == View.GONE) continue;
+            others += c.getHeight();
+        }
+        int clockExtra = clock.getPaddingTop() + clock.getPaddingBottom();
+        float availH = h > 0 ? h - others - clockExtra : 0;
+        final android.graphics.Paint paint = new android.graphics.Paint(clock.getPaint());
+        final String widest = ClockFit.widest(Prefs.clockPattern(this));
+        float px = ClockFit.fit(new ClockFit.Measure() {
+            @Override public float width(float s) {
+                paint.setTextSize(s);
+                return paint.measureText(widest);
+            }
+            @Override public float height(float s) {
+                paint.setTextSize(s);
+                android.graphics.Paint.FontMetrics fm = paint.getFontMetrics();
+                return fm.descent - fm.ascent;
+            }
+        }, w, availH, dp(72), dp(220));
+        if (Math.abs(px - lastClockPx) >= 1f) {
+            lastClockPx = px;
+            clock.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px);
+        }
+        float dpx = ClockFit.dateSize(px, 18 * density, 30 * density);
+        // The date text can be wider than the clock; shrink it to fit too.
+        final android.graphics.Paint dpaint = new android.graphics.Paint(date.getPaint());
+        final CharSequence dt = date.getText();
+        if (dt != null && dt.length() > 0 && date.getVisibility() != View.GONE) {
+            final String dts = dt.toString();
+            dpx = ClockFit.fit(new ClockFit.Measure() {
+                @Override public float width(float s) {
+                    dpaint.setTextSize(s);
+                    return dpaint.measureText(dts);
+                }
+                @Override public float height(float s) { return 0; }
+            }, w, 0, 14 * density, dpx);
+        }
+        if (Math.abs(dpx - lastDatePx) >= 1f) {
+            lastDatePx = dpx;
+            date.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, dpx);
+        }
+    }
+
     private void updateClock() {
         if (clock == null) return;
         Date now = new Date();
@@ -935,6 +1010,10 @@ public class HomeActivity extends Activity {
         String datePattern = Prefs.datePattern(this);
         if (datePattern != null) {
             Motion.swapText(date, new SimpleDateFormat(datePattern, Locale.getDefault()).format(now));
+        }
+        if (clock.getParent() instanceof LinearLayout) {
+            final LinearLayout p = (LinearLayout) clock.getParent();
+            clock.post(new Runnable() { @Override public void run() { fitClock(p); } });
         }
     }
 

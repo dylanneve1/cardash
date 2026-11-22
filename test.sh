@@ -8,9 +8,12 @@ javac -d "$OUT" \
   "$HERE/src/ie/claudius/cardash/vehicle/ObdParse.java" \
   "$HERE/src/ie/claudius/cardash/remote/RemoteForm.java" \
   "$HERE/src/ie/claudius/cardash/remote/QrCode.java" \
+  "$HERE/src/ie/claudius/cardash/ClockFit.java" \
+  "$HERE/test/ClockFitTest.java" \
   "$HERE/test/ObdParseTest.java" \
   "$HERE/test/RemoteFormTest.java" \
   "$HERE/test/QrCodeTest.java"
 java -cp "$OUT" ObdParseTest
 java -cp "$OUT" RemoteFormTest
 java -cp "$OUT" QrCodeTest
+java -cp "$OUT" ClockFitTest
