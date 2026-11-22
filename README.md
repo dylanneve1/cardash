@@ -80,6 +80,10 @@ Built for a Jancar / Rockchip RK3326 unit — Android 11, 32-bit — and kept ho
 
 OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where both report a field, the CAN box wins. When OBD reports speed, the gauge prefers it over GPS (no lag under braking, no tunnel dropout). Fuel is remembered across restarts; doors are not.
 
+## Phone settings
+
+*Settings → Phone settings → On* serves a small settings page on the local network (the head unit usually sits on the phone's hotspot). The row shows the address and a 6-digit code: open it on the phone, enter the code once, and change the dash widgets, layout and units from there. LAN only, off by default, five wrong codes lock it until it is switched off and on.
+
 ## Diagnostics
 
 Long-press the clock (or *Settings → Diagnostics*). It answers the questions you'd otherwise buy hardware to find out:
