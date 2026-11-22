@@ -24,11 +24,15 @@ P=content://ie.claudius.cardash.diag
 adb shell content query --uri $P/unit                      # identity, real API level, ROM family
 adb shell content query --uri $P/sweep                     # every car-ish intent action declared on the unit
 adb shell content query --uri $P/surface/<vendor.pkg>      # one vendor package's receivers/providers/services
+adb shell content query --uri $P/activities?q=engineer    # exported activities (hidden vendor menus); filter with ?q=
+adb shell content call  --uri $P --method launch --arg com.vendor.pkg/.SomeActivity   # risky ones also need --extra confirm:s:yes
 adb shell content query --uri $P/serial                    # serial ports (canbox UART is often /dev/ttyS*)
 adb shell content call  --uri $P --method sniff --arg 30   # live-capture car broadcasts for 30 s with typed extras
 adb shell content call  --uri $P --method sources --arg 5  # which vehicle sources are detected / heard
 adb shell content call  --uri $P --method obd --arg 20     # raw ELM327 replies, if a dongle is paired
 ```
+On a unit with no adb at all, the Diagnostics screen's **Launch activities** panel does the same on screen: every exported activity of every app (default: only those with no launcher icon), a filter box, and a Launch button that starts it by explicit component. Factory/engineer/modem/radio/RF/IMEI names and `com.mediatek.engineermode` ask for confirmation first. Rules live in `diag/ActivityTargets.java` (tested in `test/ActivityTargetsTest.java`).
+
 The Diagnostics screen (long-press the clock, or Settings) shows the same, with a plain-text export.
 
 **Capture recipe** (do each action during a `sniff` window, note the time): ignition on → open/close each door → boot → lights on/off → reverse gear → each steering wheel button → rev the engine → drive a little (speed). Then map each action to the broadcast or extra that changed. Attach the export to a "Support my head unit or car" issue.

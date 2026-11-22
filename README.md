@@ -90,6 +90,7 @@ Long-press the clock (or *Settings → Diagnostics*). It answers the questions y
 
 - **Unit** — build fingerprint, the *claimed* Android version beside the *actual* API level (vendors overstate it), ABIs, and every package that looks like car integration.
 - **Vendor service surface** — the receivers, services and providers those packages declare, with their intent actions, read from their own manifests. A **manifest sweep** of every installed package finds the car service wherever a ROM has renamed it.
+- **Launch activities** — every *exported* activity of every installed app, including the ones with no launcher icon (factory menus, canbox setup, `com.mediatek.engineermode`), with a filter box and a big **Launch** button (explicit component, errors shown on the row, never a crash). Factory/engineer/modem/radio/RF/IMEI names and EngineerMode ask for confirmation first. Built for units with no adb: it is the one APK you need.
 - **Live broadcasts** — a sniffer armed on every action the sweep found, with each extra typed (`fuel=47 (Integer)`). Re-arms itself when discovery lands.
 - **Vehicle sources** — detected / started / last heard / fields known, per source: three failure modes that look identical on the home screen.
 - **OBD-II** — paired devices, which one matched, socket state, and the last raw reply per command, verbatim. Settles "this car has no fuel PID" versus "this clone dongle is lying".
