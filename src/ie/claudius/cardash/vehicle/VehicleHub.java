@@ -57,7 +57,7 @@ public final class VehicleHub {
         }
     }
 
-    private final List<Entry> entries = new ArrayList<>(2);
+    private final List<Entry> entries = new ArrayList<>(3);
     private final List<VehicleState.Listener> listeners = new ArrayList<>(2);
     private final VehicleState merged = new VehicleState();
     private Context appCtx;
@@ -95,14 +95,14 @@ public final class VehicleHub {
         entries.clear();
         restoreFuel();
 
-        VehicleSource[] all = { new JancarSource(), new ObdSource() };
+        VehicleSource[] all = { new HcnSource(), new JancarSource(), new ObdSource() };
         for (VehicleSource s : all) {
             final Entry e = new Entry(s);
             entries.add(e);
             e.available = s.isAvailable(appCtx);
             boolean wanted = MODE_AUTO.equals(mode)
                     || (MODE_OBD.equals(mode) && s instanceof ObdSource)
-                    || (MODE_CAN.equals(mode) && s instanceof JancarSource);
+                    || (MODE_CAN.equals(mode) && (s instanceof JancarSource || s instanceof HcnSource));
             if (!e.available) {
                 e.skipped = s.status(appCtx);
             } else if (!wanted) {

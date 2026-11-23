@@ -12,7 +12,7 @@ Notes for AI agents (and people) working on CarDash or bringing up a new head un
 
 ## Code map
 - `src/.../HomeActivity.java`: the dash. `M3.java`: palette from wallpaper. `MaterialShape`/`Shapes`: tile shapes.
-- `src/.../vehicle/`: `VehicleHub` (shared instance) merges sources into `VehicleState`. `ObdSource` (ELM327 over Bluetooth SPP), `JancarSource` (canbox data via the Jancar vendor service; its action/extra names are partly guesses).
+- `src/.../vehicle/`: `VehicleHub` (shared instance) merges sources into `VehicleState`. `ObdSource` (ELM327 over Bluetooth SPP), `JancarSource` (canbox data via the Jancar vendor service; its action/extra names are partly guesses), `HcnSource` + `HcnParse` (HCN units, com.hcn.autocan: bound-service callback, door properties, Raise VW frames; facts in `docs/hcn.md`).
 - `src/.../diag/`: the Diagnostics screen and `DiagProvider` (shell/root-only API, see below).
 - `docs/car-integration.md`: hardware facts, the discovery method, and what each car platform is likely to expose.
 

@@ -23,6 +23,7 @@ import java.util.Set;
 
 import ie.claudius.cardash.Prefs;
 import ie.claudius.cardash.Receivers;
+import ie.claudius.cardash.vehicle.HcnSource;
 import ie.claudius.cardash.vehicle.JancarSource;
 import ie.claudius.cardash.vehicle.ObdSource;
 import ie.claudius.cardash.vehicle.VehicleHub;
@@ -266,6 +267,9 @@ public final class DiagProvider extends ContentProvider {
                     : ((now - e.lastUpdate) / 1000) + " s ago");
             sb.append("\n  fields known: ").append(e.knownFields).append('/')
                     .append(VehicleState.FIELDS).append('\n');
+            if (e.source instanceof HcnSource) {
+                sb.append(DiagnosticsActivity.hcnText((HcnSource) e.source));
+            }
             if (obdDetail && e.source instanceof ObdSource) {
                 ObdSource.Diag d = ((ObdSource) e.source).diag();
                 sb.append("  paired: ").append(d.paired).append("\n  matched: ").append(d.matched)
