@@ -90,6 +90,8 @@ public class DiagnosticsActivity extends Activity {
     private EditText protocolField;
 
     private String targetsText = "";
+    /** Hardware/capability sections, filled once by the probe thread. */
+    private java.util.Map<String, String> deviceSections = new java.util.LinkedHashMap<>();
 
     private final Log sniff = new Log();
     private final Log keys = new Log();
@@ -283,6 +285,13 @@ public class DiagnosticsActivity extends Activity {
                     }
                 });
 
+                final java.util.Map<String, String> device = DeviceReport.sections(ctx);
+                post(new Runnable() {
+                    public void run() {
+                        deviceSections = device;
+                    }
+                });
+
                 final List<Probe.Hit> hits = Probe.sweep(ctx);
                 Probe.rememberSweep(ctx, hits);
                 final List<String> all = Probe.merge(Probe.vendorPackages(ctx), hits);
@@ -459,7 +468,7 @@ public class DiagnosticsActivity extends Activity {
         ObdSource.Diag d = obd.diag();
         StringBuilder sb = new StringBuilder();
         sb.append("paired devices (").append(d.paired.size()).append("):\n");
-        for (String p : d.paired) sb.append("  ").append(p).append('\n');
+        for (String p : d.paired) sb.append("  ").append(p).append('\n'); // masked in report()
         sb.append("matched as dongle: ").append(d.matched == null ? "none" : d.matched).append('\n');
         sb.append("socket: ").append(d.socket).append('\n');
         if (!d.raw.isEmpty()) {
@@ -468,7 +477,7 @@ public class DiagnosticsActivity extends Activity {
                 sb.append(String.format(Locale.US, "  %-6s %s%n", e.getKey(), e.getValue()));
             }
         }
-        return sb.toString();
+        return ExportText.maskText(sb.toString());
     }
 
     private void renderSources() {
@@ -562,7 +571,15 @@ public class DiagnosticsActivity extends Activity {
         section(sb, "KEY EVENTS", keys.joined());
         section(sb, "WIRELESS ANDROID AUTO", aaText);
         section(sb, "SERIAL PORTS", serialText);
-        return sb.toString();
+        if (deviceSections.isEmpty()) {
+            section(sb, "DEVICE CAPABILITIES", "(not read yet)");
+        } else {
+            for (java.util.Map.Entry<String, String> e : deviceSections.entrySet()) {
+                section(sb, e.getKey(), e.getValue());
+            }
+        }
+        // Exports get posted publicly: hide device-specific MAC halves and serials.
+        return ExportText.maskText(sb.toString());
     }
 
     private void copyReport() {
