@@ -12,14 +12,18 @@ javac -d "$OUT" \
   "$HERE/src/ie/claudius/cardash/diag/ActivityTargets.java" \
   "$HERE/src/ie/claudius/cardash/ClockFit.java" \
   "$HERE/test/ClockFitTest.java" \
+  "$HERE/src/ie/claudius/cardash/diag/ExportText.java" \
+  "$HERE/src/ie/claudius/cardash/Labels.java" \
   "$HERE/test/ObdParseTest.java" \
   "$HERE/test/HcnParseTest.java" \
   "$HERE/test/RemoteFormTest.java" \
   "$HERE/test/QrCodeTest.java" \
-  "$HERE/test/ActivityTargetsTest.java"
+  "$HERE/test/ActivityTargetsTest.java" \
+  "$HERE/test/ExportTextTest.java"
 java -cp "$OUT" ObdParseTest
 java -cp "$OUT" HcnParseTest
 java -cp "$OUT" RemoteFormTest
 java -cp "$OUT" QrCodeTest
 java -cp "$OUT" ActivityTargetsTest
 java -cp "$OUT" ClockFitTest
+java -cp "$OUT" ExportTextTest
