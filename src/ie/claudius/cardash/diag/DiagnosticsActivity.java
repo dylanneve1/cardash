@@ -42,6 +42,7 @@ import ie.claudius.cardash.Prefs;
 import ie.claudius.cardash.R;
 import ie.claudius.cardash.Receivers;
 import ie.claudius.cardash.Shapes;
+import ie.claudius.cardash.vehicle.HcnSource;
 import ie.claudius.cardash.vehicle.JancarSource;
 import ie.claudius.cardash.vehicle.ObdSource;
 import ie.claudius.cardash.vehicle.VehicleHub;
@@ -427,6 +428,7 @@ public class DiagnosticsActivity extends Activity {
                     : ((now - e.lastUpdate) / 1000) + " s ago").append('\n');
             sb.append("    fields     ").append(e.knownFields).append(" of ")
                     .append(VehicleState.FIELDS).append(" known\n");
+            if (e.source instanceof HcnSource) sb.append(hcnText((HcnSource) e.source));
         }
         if (hub.entries().isEmpty()) sb.append("(hub not running)\n");
         VehicleState m = hub.merged();
@@ -436,6 +438,20 @@ public class DiagnosticsActivity extends Activity {
                 .append(" RL=").append(m.doorRearLeft).append(" RR=").append(m.doorRearRight)
                 .append(" boot=").append(m.boot).append("\n        handbrake=").append(m.handbrake)
                 .append(" reverse=").append(m.reverse).append('\n');
+        return sb.toString();
+    }
+
+    /**
+     * HCN: what the frames decoded to, then the last raw callback
+     * payloads and property changes, verbatim. On the car this is what
+     * settles whether a bit means what docs/hcn.md says it means.
+     */
+    static String hcnText(HcnSource h) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("    decoded    ").append(h.decoded().replace("\n", "\n               ")).append('\n');
+        List<String> raw = h.recentPayloads();
+        sb.append("    raw log (").append(raw.size()).append(", newest last)\n");
+        for (String r : raw) sb.append("      ").append(r).append('\n');
         return sb.toString();
     }
 

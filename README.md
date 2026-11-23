@@ -77,6 +77,7 @@ Built for a Jancar / Rockchip RK3326 unit — Android 11, 32-bit — and kept ho
 | GPS | The unit's own receiver | Speed, trip distance, position for weather |
 | `ObdSource` | ELM327 Bluetooth dongle | RPM, speed, coolant, fuel level |
 | `JancarSource` | CAN box on the harness | Doors, boot, handbrake, reverse, fuel |
+| `HcnSource` | HCN head units (`com.hcn.autocan`), Raise box | Doors, boot; handbrake, RPM, fuel if the vendor service passes frames on ([docs/hcn.md](docs/hcn.md)) — untested on a car |
 
 OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where both report a field, the CAN box wins. When OBD reports speed, the gauge prefers it over GPS (no lag under braking, no tunnel dropout). Fuel is remembered across restarts; doors are not.
 
@@ -130,7 +131,7 @@ Settings → Apps → Default apps → Home app. The stock launcher stays instal
 
 ```sh
 ./build.sh      # -> cardash.apk
-./test.sh       # plain-JVM tests: OBD parser, phone settings page, QR encoder
+./test.sh       # plain-JVM tests: OBD parser, HCN/Raise frames, phone settings page, QR encoder
 ```
 
 Needs an Android SDK with build-tools 35.0.0+ and platform 34 (`ANDROID_SDK_ROOT` if it isn't in the default place). The script generates a debug keystore on first run; use your own for anything you hand to other people.
