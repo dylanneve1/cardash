@@ -66,10 +66,7 @@ public final class Apps {
         for (ResolveInfo ri : found) {
             String pkg = ri.activityInfo.packageName;
             if (self.equals(pkg)) continue; // don't offer ourselves
-            CharSequence label = ri.loadLabel(pm);
-            out.add(new Entry(pkg,
-                    label == null ? pkg : label.toString(),
-                    ri.loadIcon(pm)));
+            out.add(new Entry(pkg, labelOf(pm, ri), ri.loadIcon(pm)));
         }
 
         final Collator collator = Collator.getInstance();
@@ -98,8 +95,7 @@ public final class Apps {
             String pkg = ri.activityInfo.packageName;
             if (self.equals(pkg) || seen.contains(pkg)) continue;
             seen.add(pkg);
-            CharSequence label = ri.loadLabel(pm);
-            out.add(new String[] { pkg, label == null ? pkg : label.toString() });
+            out.add(new String[] { pkg, labelOf(pm, ri) });
         }
         final Collator collator = Collator.getInstance();
         Collections.sort(out, new Comparator<String[]>() {
@@ -111,15 +107,40 @@ public final class Apps {
         return out;
     }
 
+    /** App label, else the activity's label, else a cleaned-up package segment. */
+    private static String labelOf(PackageManager pm, ResolveInfo ri) {
+        CharSequence app = null, act = null;
+        try {
+            app = ri.activityInfo.applicationInfo.loadLabel(pm);
+        } catch (Exception ignored) { }
+        try {
+            act = ri.activityInfo.loadLabel(pm);
+        } catch (Exception ignored) { }
+        return Labels.pick(ri.activityInfo.packageName, app, act);
+    }
+
+    /** Is this app a firmware updater (by package or launch activity)? Never a default tile. */
+    private static boolean risky(PackageManager pm, String pkg) {
+        if (ie.claudius.cardash.diag.ActivityTargets.riskyPackage(pkg)) return true;
+        Intent i = pm.getLaunchIntentForPackage(pkg);
+        if (i == null || i.getComponent() == null) return false;
+        return ie.claudius.cardash.diag.ActivityTargets.risk(pkg, i.getComponent().getClassName()) != null;
+    }
+
     public static Entry byPackage(Context ctx, String pkg) {
         if (pkg == null) return null;
         PackageManager pm = ctx.getPackageManager();
         Intent launch = pm.getLaunchIntentForPackage(pkg);
         if (launch == null) return null; // uninstalled since we saved it
         try {
-            CharSequence label = pm.getApplicationLabel(
-                    pm.getApplicationInfo(pkg, 0));
-            return new Entry(pkg, label.toString(), pm.getApplicationIcon(pkg));
+            CharSequence app = pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0));
+            CharSequence act = null;
+            if (launch.getComponent() != null) {
+                try {
+                    act = pm.getActivityInfo(launch.getComponent(), 0).loadLabel(pm);
+                } catch (Exception ignored) { }
+            }
+            return new Entry(pkg, Labels.pick(pkg, app, act), pm.getApplicationIcon(pkg));
         } catch (PackageManager.NameNotFoundException e) {
             return null;
         }
@@ -186,14 +207,15 @@ public final class Apps {
 
         for (String pkg : PREFERRED) {
             if (chosen.size() >= TILES) break;
-            if (pm.getLaunchIntentForPackage(pkg) != null && !chosen.contains(pkg)) {
+            if (pm.getLaunchIntentForPackage(pkg) != null && !chosen.contains(pkg)
+                    && !risky(pm, pkg)) {
                 chosen.add(pkg);
             }
         }
         // Still short? Top up from whatever else is installed.
         for (Entry entry : launchable(ctx)) {
             if (chosen.size() >= TILES) break;
-            if (!chosen.contains(entry.pkg)) chosen.add(entry.pkg);
+            if (!chosen.contains(entry.pkg) && !risky(pm, entry.pkg)) chosen.add(entry.pkg);
         }
 
         SharedPreferences.Editor e = p.edit();

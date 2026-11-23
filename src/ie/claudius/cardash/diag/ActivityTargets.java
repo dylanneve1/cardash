@@ -74,6 +74,24 @@ public final class ActivityTargets {
     }
 
     private static final String[] RISKY_WORDS = { "factory", "engineer", "modem", "radio", "imei" };
+    /** Firmware-updater words: matched only as whole words/segments ("flash" but not "Flashlight"). */
+    private static final String[] RISKY_SEGMENTS = { "rf", "mcu", "upgrade", "update", "flash", "ota" };
+    /** Package segments that merely end in a word ("canupgrade", "autoupdate"). */
+    private static final String[] RISKY_SUFFIXES = { "upgrade", "update", "flash" };
+
+    /** Is this package a firmware updater (MCU/canbox flasher, OTA)? Used to keep it off default tiles. */
+    public static boolean riskyPackage(String pkg) {
+        if (pkg == null) return false;
+        for (String seg : pkg.toLowerCase(Locale.US).split("\\.")) {
+            for (String w : RISKY_SEGMENTS) {
+                if (!w.equals("rf") && seg.equals(w)) return true;
+            }
+            for (String w : RISKY_SUFFIXES) {
+                if (seg.endsWith(w)) return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * Why launching this deserves a confirmation, or null if nothing
@@ -101,8 +119,17 @@ public final class ActivityTargets {
                 return "The name contains \"RF\": RF test pages can change radio settings "
                         + "that are hard to undo.";
             }
+            for (String w : RISKY_SEGMENTS) {
+                if (!w.equals("rf") && word.equals(w)) return updaterRisk(w);
+            }
         }
+        if (riskyPackage(pkg)) return updaterRisk("upgrade/update");
         return null;
+    }
+
+    private static String updaterRisk(String w) {
+        return "The name contains \"" + w + "\": MCU, canbox and system updaters can flash "
+                + "firmware, and an interrupted flash can brick the unit.";
     }
 
     /** Split a class name into lower-case words at dots, underscores, digits and camel-case humps. */
