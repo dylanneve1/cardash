@@ -50,7 +50,9 @@ echo "==> zipalign"
 "$BT/zipalign" -f -p 4 "$OUT/unsigned.apk" "$OUT/aligned.apk"
 
 echo "==> sign"
-KS="$HERE/cardash.keystore"
+# CARDASH_KEYSTORE: a fixed key (CI uses ci/test-signing.jks so test APKs install over each other);
+# unset, a local throwaway key is generated as before. Same alias and passwords either way.
+KS="${CARDASH_KEYSTORE:-$HERE/cardash.keystore}"
 if [ ! -f "$KS" ]; then
   keytool -genkeypair -v -keystore "$KS" -alias cardash \
     -keyalg RSA -keysize 2048 -validity 10950 \
