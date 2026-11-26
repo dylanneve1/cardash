@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plain-JVM tests for the Android-free parts (ELM327 parsing, HCN/Raise frames, phone settings page, QR code, exported-activity launcher).
+# Plain-JVM tests for the Android-free parts (ELM327 parsing, HCN/Raise frames, phone settings page, QR code, exported-activity launcher, clock fit, home layout model).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/build/test"
@@ -14,6 +14,8 @@ javac -d "$OUT" \
   "$HERE/test/ClockFitTest.java" \
   "$HERE/src/ie/claudius/cardash/diag/ExportText.java" \
   "$HERE/src/ie/claudius/cardash/Labels.java" \
+  "$HERE"/src/ie/claudius/cardash/layout/*.java \
+  "$HERE/test/HomeLayoutTest.java" \
   "$HERE/test/ObdParseTest.java" \
   "$HERE/test/HcnParseTest.java" \
   "$HERE/test/RemoteFormTest.java" \
@@ -27,3 +29,4 @@ java -cp "$OUT" QrCodeTest
 java -cp "$OUT" ActivityTargetsTest
 java -cp "$OUT" ClockFitTest
 java -cp "$OUT" ExportTextTest
+java -cp "$OUT" HomeLayoutTest

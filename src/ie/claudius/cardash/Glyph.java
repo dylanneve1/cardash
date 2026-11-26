@@ -18,7 +18,7 @@ import android.graphics.drawable.Drawable;
  */
 public final class Glyph extends Drawable {
 
-    public enum Kind { PREV, PLAY, PAUSE, NEXT, GEAR }
+    public enum Kind { PREV, PLAY, PAUSE, NEXT, GEAR, PLUS, CLOSE, RESIZE }
 
     private final Kind kind;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -60,6 +60,21 @@ public final class Glyph extends Drawable {
             case GEAR:
                 gear(cx, cy, s);
                 break;
+            case PLUS:
+                path.addRoundRect(cx - s * 0.14f, cy - s * 0.72f, cx + s * 0.14f, cy + s * 0.72f,
+                        s * 0.1f, s * 0.1f, Path.Direction.CW);
+                path.addRoundRect(cx - s * 0.72f, cy - s * 0.14f, cx + s * 0.72f, cy + s * 0.14f,
+                        s * 0.1f, s * 0.1f, Path.Direction.CW);
+                break;
+            case CLOSE:
+                stroke(canvas, cx - s * 0.6f, cy - s * 0.6f, cx + s * 0.6f, cy + s * 0.6f, s * 0.26f);
+                stroke(canvas, cx + s * 0.6f, cy - s * 0.6f, cx - s * 0.6f, cy + s * 0.6f, s * 0.26f);
+                break;
+            case RESIZE:
+                // Three diagonal ticks hugging the bottom-right corner.
+                stroke(canvas, cx + s * 0.7f, cy - s * 0.1f, cx - s * 0.1f, cy + s * 0.7f, s * 0.2f);
+                stroke(canvas, cx + s * 0.7f, cy - s * 0.7f, cx - s * 0.7f, cy + s * 0.7f, s * 0.2f);
+                break;
             case PREV:
                 triangle(cx + s * 0.9f, cy, -s, s);
                 triangle(cx + s * 0.05f, cy, -s, s);
@@ -95,6 +110,14 @@ public final class Glyph extends Drawable {
         Path hub = new Path();
         hub.addCircle(cx, cy, s * 0.28f, Path.Direction.CW);
         path.op(hub, Path.Op.DIFFERENCE);
+    }
+
+    private void stroke(Canvas canvas, float x0, float y0, float x1, float y1, float width) {
+        Paint p = new Paint(paint);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(width);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        canvas.drawLine(x0, y0, x1, y1, p);
     }
 
     /** Triangle with its apex at (tipX ± width) and base at tipX. */

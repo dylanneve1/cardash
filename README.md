@@ -64,6 +64,22 @@ Everything lives behind the gear next to *All apps*. Options are deliberately fe
   <img src="screenshots/10-wallpapers.png" alt="Bundled wallpapers" width="880">
 </p>
 
+
+## Make the home screen yours
+
+The home screen is a grid of cells (12 × 8 on a 1280×720 unit, worked out from the screen size) with any number of pages. It looks the way it always did until you change it.
+
+- **Edit:** long-press empty space or any widget (or the clock → *Edit home screen*, or *Settings → Home screen → Edit*, or *All apps → Edit home screen*).
+- **Move:** drag a widget; it snaps to cells and never lands on another one. **Resize:** drag the round handle in its bottom-right corner. **Settings of a widget:** the gear on it. **Remove:** the X. Everything is 48 dp or bigger.
+- **Add:** *Add* in the bar at the bottom: an app, clock, date, now playing, speedometer, trip, weather, a single vehicle value (coolant, fuel, rpm, speed) as a bar or a gauge with its own minimum, maximum and warning threshold (default coolant 0–120 °C, red from 110), door status, the all-apps button, the settings button, the vehicle strip.
+- **Pages:** swipe sideways between pages. In edit mode, *+ Page* adds an empty page or a ready-made vehicle page (three gauges, doors, speed bar); *Delete page* removes one.
+- **Done** keeps the changes, **Cancel** throws them away, **Default** goes back to the original layout.
+- **All apps:** swipe up from anywhere on the home screen (or add the all-apps button).
+- **Never locked out:** the bar's gear opens Settings in edit mode; long-pressing the clock opens a menu with Settings; the all-apps screen has Settings and *Edit home screen* buttons.
+- **Left- or right-hand drive:** *Settings → Steering wheel* mirrors the layout so the clock side is next to the driver.
+
+The layout is stored as JSON in the app's preferences (`home_layout`); the model and its tests are plain Java in `layout/` (`./test.sh`).
+
 ## Hardware
 
 Built for a Jancar / Rockchip RK3326 unit — Android 11, 32-bit — and kept honest about it:
@@ -87,7 +103,7 @@ OBD-II has no PID for door state — that lives on the body bus — so doors nee
 
 ## Diagnostics
 
-Long-press the clock (or *Settings → Diagnostics*). It answers the questions you'd otherwise buy hardware to find out:
+Long-press the clock and choose *Diagnostics* (or *Settings → Diagnostics*). It answers the questions you'd otherwise buy hardware to find out:
 
 - **Unit** — build fingerprint, the *claimed* Android version beside the *actual* API level (vendors overstate it), ABIs, and every package that looks like car integration.
 - **Vendor service surface** — the receivers, services and providers those packages declare, with their intent actions, read from their own manifests. A **manifest sweep** of every installed package finds the car service wherever a ROM has renamed it.
@@ -126,7 +142,7 @@ Grab the APK from a [CI run](https://github.com/dylanneve1/cardash/actions) or b
 adb install -r cardash.apk
 ```
 
-Settings → Apps → Default apps → Home app. The stock launcher stays installed; switching back is the same two taps. Long-press any tile to reassign it.
+Settings → Apps → Default apps → Home app. The stock launcher stays installed; switching back is the same two taps. Long-press the home screen to edit it (tiles included).
 
 ## Build
 

@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -47,13 +48,37 @@ public class AppListActivity extends Activity {
         column.setPadding(pad, pad, pad, pad);
         scroll.addView(column);
 
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(8), 0, dp(8), dp(16));
+
         TextView title = new TextView(this);
         title.setText(picking ? R.string.pick_app : R.string.all_apps);
         title.setTypeface(Fonts.display(this));
         title.setTextColor(m3.onSurface());
         title.setTextSize(26);
-        title.setPadding(dp(8), 0, 0, dp(16));
-        column.addView(title);
+        header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        if (!picking) {
+            // Always reachable from here, even when the home screen has been emptied.
+            header.addView(headerButton(R.string.menu_edit, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent i = new Intent(AppListActivity.this, HomeActivity.class);
+                    i.putExtra(HomeActivity.EXTRA_EDIT, true);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    startActivity(i);
+                    finish();
+                }
+            }));
+            header.addView(headerButton(R.string.settings, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startActivity(new Intent(AppListActivity.this, SettingsActivity.class));
+                }
+            }));
+        }
+        column.addView(header);
 
         GridLayout grid = new GridLayout(this);
         grid.setColumnCount(COLUMNS);
@@ -119,6 +144,28 @@ public class AppListActivity extends Activity {
             }
         });
         return cell;
+    }
+
+    private View headerButton(int text, View.OnClickListener click) {
+        TextView b = new TextView(this);
+        b.setText(text);
+        b.setTypeface(Fonts.display(this));
+        b.setTextSize(16);
+        b.setGravity(Gravity.CENTER);
+        b.setMinHeight(dp(48));
+        b.setMinWidth(dp(48));
+        b.setTextColor(m3.onPrimaryContainer());
+        b.setBackground(Shapes.pill(density, m3.primaryContainer(),
+                M3.withAlpha(m3.onPrimaryContainer(), 0x40)));
+        b.setPadding(dp(20), dp(8), dp(20), dp(8));
+        b.setClickable(true);
+        Shapes.springy(b);
+        b.setOnClickListener(click);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.leftMargin = dp(10);
+        b.setLayoutParams(lp);
+        return b;
     }
 
     private int dp(int v) {

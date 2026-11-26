@@ -4,7 +4,7 @@
     <string name="all_apps">All apps</string>
     <string name="pick_app">Pick an app for this tile</string>
     <string name="empty_tile">Add</string>
-    <string name="hint_long_press">Long-press a tile to change it</string>
+    <string name="hint_long_press">Long-press the home screen to edit it. Swipe up for all apps.</string>
     <string name="nothing_playing">Nothing playing</string>
     <string name="weather_waiting">Weather unavailable</string>
 
@@ -138,11 +138,46 @@
     <string name="s_remote_nolan">On, waiting for Wi-Fi or a hotspot</string>
     <string name="s_remote_locked">Locked after wrong codes. Turn off and on for a new code</string>
     <string name="s_hint">Tips</string>
-    <string name="s_hint_caption">The long-press reminder under the clock</string>
+    <string name="s_hint_caption">The one-off reminder that the home screen can be edited</string>
     <string name="s_hint_show">Show</string>
     <string name="s_hint_hide">Hide</string>
     <string name="s_reset">Home tiles</string>
     <string name="s_reset_caption">Put the default apps back on every tile</string>
     <string name="s_reset_action">Reset</string>
     <string name="s_reset_done">Reset ✓</string>
+
+    <!-- Configurable home screen (#20) -->
+    <string name="remove">Remove</string>
+    <string name="resize">Resize</string>
+    <string name="empty_home">Long-press to edit. Swipe up for all apps.</string>
+    <string name="edit_empty">Nothing here. Tap Add to place something.</string>
+    <string name="edit_hint">Drag to move. Drag the corner to resize. Gear for settings, X to remove.</string>
+    <string name="edit_add">Add</string>
+    <string name="edit_add_title">Add to this page</string>
+    <string name="edit_app">App</string>
+    <string name="edit_choose_app">Choose app…</string>
+    <string name="edit_no_room">No room on this page</string>
+    <string name="edit_page_add">+ Page</string>
+    <string name="edit_page_remove">Delete page</string>
+    <string name="edit_page_empty">Empty page</string>
+    <string name="edit_page_vehicle">Vehicle page (gauges, doors, speed)</string>
+    <string name="edit_page_remove_q">Delete this page and everything on it?</string>
+    <string name="edit_page_clear_q">This is the only page. Clear everything on it?</string>
+    <string name="edit_page_clear">Clear</string>
+    <string name="edit_reset">Default</string>
+    <string name="edit_reset_q">Replace the layout with the default one?</string>
+    <string name="edit_discard">Discard</string>
+    <string name="edit_discard_q">Discard your changes?</string>
+    <string name="edit_back_hint">Tap Done to keep your changes, or Cancel to discard them</string>
+    <string name="menu_edit">Edit home screen</string>
+    <string name="trip_reset_q">Reset the trip meter?</string>
+    <string name="s_home">Home screen</string>
+    <string name="s_home_caption">Move, resize, add and remove widgets and apps; add pages</string>
+    <string name="s_home_edit">Edit</string>
+    <string name="s_home_reset">Default layout</string>
+    <string name="s_home_reset_caption">Throw away your layout and go back to the one the options below describe</string>
+    <string name="s_side">Steering wheel</string>
+    <string name="s_side_caption">Mirrors the layout so the clock side is next to the driver</string>
+    <string name="s_side_lhd">Left</string>
+    <string name="s_side_rhd">Right</string>
 </resources>

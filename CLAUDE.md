@@ -11,7 +11,7 @@ Notes for AI agents (and people) working on CarDash or bringing up a new head un
 - Be terse in reports. State what was tested on hardware and what wasn't.
 
 ## Code map
-- `src/.../HomeActivity.java`: the dash. `M3.java`: palette from wallpaper. `MaterialShape`/`Shapes`: tile shapes.
+- `src/.../HomeActivity.java`: the dash (data sources, edit-mode switch). The layout is data: `layout/` (Android-free, tested: `HomeLayout` pages of items, `Grid`, `Arrange` collisions, `Defaults` = the original look, `Kind` widget types and their settings, `Json`). `LayoutStore` loads/saves it, `GridPage` lays it out (and does drag/resize in edit mode), `HomePager` pages and swipe-up, `Widgets` builds each widget and feeds it live data, `HomeEditor` is the edit toolbar and dialogs. `M3.java`: palette from wallpaper. `MaterialShape`/`Shapes`: tile shapes.
 - `src/.../vehicle/`: `VehicleHub` (shared instance) merges sources into `VehicleState`. `ObdSource` (ELM327 over Bluetooth SPP), `JancarSource` (canbox data via the Jancar vendor service; its action/extra names are partly guesses), `HcnSource` + `HcnParse` (HCN units, com.hcn.autocan: bound-service callback, door properties, Raise VW frames; facts in `docs/hcn.md`).
 - `src/.../diag/`: the Diagnostics screen and `DiagProvider` (shell/root-only API, see below).
 - `docs/car-integration.md`: hardware facts, the discovery method, and what each car platform is likely to expose.
@@ -33,7 +33,7 @@ adb shell content call  --uri $P --method obd --arg 20     # raw ELM327 replies,
 ```
 On a unit with no adb at all, the Diagnostics screen's **Launch activities…** row opens a screen (grouped by app, with icons) that does the same on screen: every exported activity of every app (default: only those with no launcher icon), a filter box, and a Launch button that starts it by explicit component. Factory/engineer/modem/radio/RF/IMEI names and `com.mediatek.engineermode` ask for confirmation first. Rules live in `diag/ActivityTargets.java` (tested in `test/ActivityTargetsTest.java`).
 
-The Diagnostics screen (long-press the clock, or Settings) shows the same, with a plain-text export.
+The Diagnostics screen (long-press the clock → Diagnostics, or Settings) shows the same, with a plain-text export.
 
 **Capture recipe** (do each action during a `sniff` window, note the time): ignition on → open/close each door → boot → lights on/off → reverse gear → each steering wheel button → rev the engine → drive a little (speed). Then map each action to the broadcast or extra that changed. Attach the export to a "Support my head unit or car" issue.
 
