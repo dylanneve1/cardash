@@ -413,7 +413,7 @@ public final class RemoteForm {
         sb.append("<section><fieldset><legend>Tiles</legend>")
                 .append("<p>In order: left to right, top to bottom")
                 .append(hero ? "; tile 1 is the wide one" : "")
-                .append(". Long-pressing a tile on the dash does the same.</p>");
+                .append(". On the dash, long-press to edit, then the gear on a tile does the same.</p>");
         for (int i = 0; i < n; i++) {
             String cur = store.get(TILE + i, null);
             if (cur == null) cur = "";
