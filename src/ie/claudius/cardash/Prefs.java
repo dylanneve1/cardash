@@ -44,6 +44,9 @@ public final class Prefs {
     /** LAN settings page for a phone (issue #1); off until asked for. */
     public static final String REMOTE = "remote";     // off | on
     public static final String CANBOX_PROTOCOLS = "canbox_protocols";
+    /** Configurable home screen (#20): the layout as JSON, absent = the default layout. */
+    public static final String HOME_LAYOUT = "home_layout";
+    public static final String SIDE = "side";         // lhd | rhd (steering wheel side)
 
     public static final String W_SPEEDO = "speedo", W_TRIP = "trip", W_WEATHER = "weather";
     public static final String[] DASH_ALL = { W_SPEEDO, W_TRIP, W_WEATHER };
@@ -181,6 +184,11 @@ public final class Prefs {
         StringBuilder sb = new StringBuilder();
         for (String w : DASH_ALL) if (now.contains(w)) sb.append(w).append(',');
         set(ctx, DASH, sb.toString());
+        prefs(ctx).edit().remove(HOME_LAYOUT).apply();
+    }
+
+    public static boolean rightHandDrive(Context ctx) {
+        return "rhd".equals(get(ctx, SIDE, "lhd"));
     }
 
     public static boolean remoteOn(Context ctx) {
@@ -193,7 +201,11 @@ public final class Prefs {
 
     /** Full-scale of the gauge in the display unit. */
     public static int gaugeMax(Context ctx) {
-        String s = get(ctx, SCALE, "auto");
+        return gaugeMax(ctx, get(ctx, SCALE, "auto"));
+    }
+
+    /** Same, for an explicit scale name (a speedometer item can override the global one). */
+    public static int gaugeMax(Context ctx, String s) {
         boolean mph = mph(ctx);
         if ("city".equals(s)) return mph ? 60 : 100;
         if ("fast".equals(s)) return mph ? 160 : 260;
@@ -241,6 +253,8 @@ public final class Prefs {
                         .remove(HINT).remove(MOTION);
                 break;
         }
+        // A preset is a shape for the default layout: it replaces any custom one.
+        e.remove(HOME_LAYOUT);
         e.putString(PRESET, preset).apply();
     }
 
@@ -257,9 +271,10 @@ public final class Prefs {
     /** Everything that changes how the home screen is built, in one string. */
     public static String signature(Context ctx) {
         String[] keys = { SPEED, TEMP, CLOCK, SEED, SCRIM, MOTION, LAYOUT, HINT,
-                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE };
+                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE, SIDE };
         StringBuilder sb = new StringBuilder();
         for (String k : keys) sb.append(get(ctx, k, "")).append('|');
-        return sb.toString();
+        String layout = get(ctx, HOME_LAYOUT, "");
+        return sb.append(layout.length()).append(':').append(layout.hashCode()).toString();
     }
 }

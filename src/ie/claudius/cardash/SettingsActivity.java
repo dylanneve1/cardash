@@ -123,8 +123,33 @@ public class SettingsActivity extends Activity {
         header.addView(done);
         column.addView(header);
 
-        // ---- appearance ----
+        // ---- home screen layout ----
         LinearLayout card = card();
+        card.addView(actionRow(R.string.s_home, R.string.s_home_caption, R.string.s_home_edit,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        Intent i = new Intent(SettingsActivity.this, HomeActivity.class);
+                        i.putExtra(HomeActivity.EXTRA_EDIT, true);
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        startActivity(i);
+                        finish();
+                    }
+                }));
+        card.addView(divider());
+        card.addView(sideRow());
+        card.addView(divider());
+        card.addView(actionRow(R.string.s_home_reset, R.string.s_home_reset_caption, R.string.s_reset_action,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        LayoutStore.reset(SettingsActivity.this);
+                    }
+                }));
+        column.addView(card, cardParams(0));
+
+        // ---- appearance ----
+        card = card();
         if (Wallpapers.supported(this)) {
             card.addView(wallpaperRow());
             card.addView(divider());
@@ -143,7 +168,7 @@ public class SettingsActivity extends Activity {
         card.addView(row(R.string.s_motion, R.string.s_motion_caption, Prefs.MOTION, "expressive",
                 new String[] { "expressive", "calm" },
                 new int[] { R.string.s_motion_expressive, R.string.s_motion_calm }, false));
-        column.addView(card, cardParams(0));
+        column.addView(card, cardParams(dp(16)));
 
         // ---- widgets ----
         card = card();
@@ -248,10 +273,39 @@ public class SettingsActivity extends Activity {
                     if (value.equals(Prefs.get(SettingsActivity.this, key, def))) return;
                     Prefs.set(SettingsActivity.this, key, value);
                     handTuned();
+                    // The hero/grid tile shape is a property of the default layout: choosing it replaces a custom one.
+                    if (Prefs.LAYOUT.equals(key)) LayoutStore.reset(SettingsActivity.this);
                     if (rethemes || Prefs.MOTION.equals(key)) {
                         rebuild(false);
                         return;
                     }
+                    for (int j = 0; j < group.getChildCount(); j++) {
+                        TextView o = (TextView) group.getChildAt(j);
+                        style(o, o == opt);
+                    }
+                    Motion.pop(opt);
+                }
+            });
+            group.addView(opt);
+        }
+        row.addView(group);
+        return row;
+    }
+
+    /** Steering wheel side. Not a plain pref: switching mirrors the saved layout. */
+    private View sideRow() {
+        LinearLayout row = rowShell(R.string.s_side, R.string.s_side_caption);
+        final LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.HORIZONTAL);
+        final boolean rhd = Prefs.rightHandDrive(this);
+        int[] labels = { R.string.s_side_lhd, R.string.s_side_rhd };
+        for (int i = 0; i < 2; i++) {
+            final boolean right = i == 1;
+            final TextView opt = pill(getString(labels[i]), right == rhd);
+            opt.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    LayoutStore.setSide(SettingsActivity.this, right);
                     for (int j = 0; j < group.getChildCount(); j++) {
                         TextView o = (TextView) group.getChildAt(j);
                         style(o, o == opt);
