@@ -129,6 +129,7 @@ public class HomeActivity extends Activity {
         f.addAction(Intent.ACTION_TIME_CHANGED);
         f.addAction(Intent.ACTION_TIMEZONE_CHANGED);
         Receivers.register(this, timeTick, f, false);
+        maybeAskLocation();
         if (speed == null) speed = new SpeedSource(this);
         speed.start(new SpeedSource.Listener() {
             @Override
@@ -208,6 +209,20 @@ public class HomeActivity extends Activity {
         } else {
             updateClock();
         }
+    }
+
+    /** Location is a runtime permission on API 23+: without it the GPS speed never starts. Asked once per launch;
+     *  the dialog pauses this activity, and the onResume after it starts SpeedSource with the answer. */
+    private static boolean askedLocation;
+
+    private void maybeAskLocation() {
+        if (android.os.Build.VERSION.SDK_INT < 23 || askedLocation) return;
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+        askedLocation = true;
+        requestPermissions(new String[] {
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION }, 41);
     }
 
     @Override
