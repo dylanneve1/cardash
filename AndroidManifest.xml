@@ -18,6 +18,7 @@
     <!-- GPS drives the speedometer and gives the weather card a
          position; no canbox and no OBD dongle needed. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Diagnostics: the wireless-Android-Auto capability checks. -->
