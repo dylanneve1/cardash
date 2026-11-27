@@ -175,6 +175,15 @@ public class HomeLayoutTest {
         check(Kind.warning(10, 15, "below") && !Kind.warning(40, 15, "below"), "fuel warns when low");
         check(Kind.vehicleRange("coolant")[1] == 120 && Kind.vehicleRange("coolant")[2] == 110, "coolant default range");
 
+        check(Kind.vehicleRange("rpm")[2] == 5500 && "above".equals(Kind.vehicleWarnDir("rpm")), "rpm warns from 5500");
+        check(Kind.vehicleStep("rpm") == 250 && Kind.vehicleStep("coolant") == 5, "stepper steps");
+        check(!Kind.warningHeld(false, 5499, 5500, "above", 0, 8000), "not yet");
+        check(Kind.warningHeld(false, 5500, 5500, "above", 0, 8000), "at the threshold");
+        check(Kind.warningHeld(true, 5400, 5500, "above", 0, 8000)
+                && !Kind.warningHeld(true, 5300, 5500, "above", 0, 8000), "holds, then clears");
+        check(Kind.warningHeld(true, 16, 15, "below", 0, 100) && !Kind.warningHeld(true, 18, 15, "below", 0, 100),
+                "hysteresis below");
+
         if (fails == 0) System.out.println("HomeLayoutTest: ok");
         else { System.out.println("HomeLayoutTest: " + fails + " failure(s)"); System.exit(1); }
     }

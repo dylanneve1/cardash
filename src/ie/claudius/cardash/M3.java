@@ -66,6 +66,11 @@ public final class M3 {
     public int tertiaryContainer()   { return tertiary.tone(30); }
     public int onTertiaryContainer() { return tertiary.tone(90); }
 
+    // The M3 baseline error roles: red stays red whatever the wallpaper.
+    public int error()              { return 0xFFFFB4AB; }
+    public int errorContainer()     { return 0xFF93000A; }
+    public int onErrorContainer()   { return 0xFFFFDAD6; }
+
     public int surface()            { return neutral.tone(6); }
     public int surfaceContainer()   { return neutral.tone(12); }
     public int surfaceContainerHigh(){ return neutral.tone(17); }

@@ -441,7 +441,8 @@ final class Widgets {
         int[] def = Kind.vehicleRange(field);
         final ValueView v = new ValueView(ctx, M3.withAlpha(m3.onSurface(), 0x26), m3.primary(),
                 m3.onSurface(), m3.onSurfaceVariant());
-        v.setBackground(Shapes.round(d, m3.surfaceContainer(), 28));
+        v.setBoxes(Shapes.round(d, m3.surfaceContainer(), 28), Shapes.round(d, m3.errorContainer(), 28),
+                m3.error(), m3.onErrorContainer());
         v.configure(Kind.vehicleLabel(field), Kind.vehicleUnit(field), "gauge".equals(it.get("style", "bar")),
                 it.getInt("min", def[0]), it.getInt("max", def[1]), it.getInt("warn", def[2]),
                 it.get("warndir", Kind.vehicleWarnDir(field)));

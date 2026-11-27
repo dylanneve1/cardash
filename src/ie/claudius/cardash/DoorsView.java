@@ -51,7 +51,7 @@ public final class DoorsView extends android.view.View {
             part.setColor(unknown);
         } else {
             part.setStyle(Paint.Style.FILL);
-            part.setColor(t == VehicleState.Tri.YES ? ValueView.WARN : shut);
+            part.setColor(t == VehicleState.Tri.YES ? 0xFFFF5449 : shut);
         }
         c.drawRoundRect(r, 5 * d, 5 * d, part);
     }

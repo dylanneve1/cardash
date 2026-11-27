@@ -189,7 +189,8 @@ final class HomeEditor implements GridPage.Edit {
                     }
                 });
             } else {
-                pop.stepper(o.label, it.getInt(o.key, Integer.parseInt(o.def)), o.min, o.max, o.step,
+                int step = Kind.VEHICLE.equals(it.type) ? Kind.vehicleStep(it.get("field", "coolant")) : o.step;
+                pop.stepper(o.label, it.getInt(o.key, Integer.parseInt(o.def)), o.min, o.max, step,
                         new Pop.Count() {
                             @Override public void on(int v) { it.settings.put(o.key, String.valueOf(v)); }
                         });
