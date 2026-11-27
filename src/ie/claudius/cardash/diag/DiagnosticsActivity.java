@@ -491,6 +491,7 @@ public class DiagnosticsActivity extends Activity {
                 .append(d.chosen == null ? "none (matching paired devices by name)" : d.chosen).append('\n');
         sb.append("matched as dongle: ").append(d.matched == null ? "none" : d.matched).append('\n');
         sb.append("socket: ").append(d.socket).append('\n');
+        sb.append(ObdText.link(d));
         if (!d.raw.isEmpty()) {
             sb.append("\nlast raw reply per command:\n");
             for (Map.Entry<String, String> e : d.raw.entrySet()) {

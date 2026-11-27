@@ -30,6 +30,27 @@ public final class VehicleState {
     public Tri handbrake = Tri.UNKNOWN;
     public Tri reverse = Tri.UNKNOWN;
 
+    /** Wall-clock millis of the last valid OBD data reply, 0 for never. */
+    public long obdReplyMillis;
+
+    /** A snapshot that later writes to this one don't touch. */
+    public VehicleState copy() {
+        VehicleState c = new VehicleState();
+        c.fuelPercent = fuelPercent;
+        c.speedKph = speedKph;
+        c.rpm = rpm;
+        c.coolantC = coolantC;
+        c.doorFrontLeft = doorFrontLeft;
+        c.doorFrontRight = doorFrontRight;
+        c.doorRearLeft = doorRearLeft;
+        c.doorRearRight = doorRearRight;
+        c.boot = boot;
+        c.handbrake = handbrake;
+        c.reverse = reverse;
+        c.obdReplyMillis = obdReplyMillis;
+        return c;
+    }
+
     public boolean hasAnything() {
         return fuelPercent != UNKNOWN_INT
                 || speedKph != UNKNOWN_INT

@@ -302,6 +302,7 @@ public final class DiagProvider extends ContentProvider {
                 sb.append("  paired: ").append(d.paired).append("\n  chosen: ").append(d.chosen)
                         .append("\n  matched: ").append(d.matched)
                         .append("\n  socket: ").append(d.socket).append('\n');
+                sb.append(ObdText.link(d));
                 for (Map.Entry<String, String> raw : d.raw.entrySet()) {
                     sb.append("  ").append(raw.getKey()).append(" -> ").append(raw.getValue()).append('\n');
                 }
