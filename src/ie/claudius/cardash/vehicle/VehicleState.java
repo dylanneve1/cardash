@@ -37,6 +37,8 @@ public final class VehicleState {
     public Tri handbrake = Tri.UNKNOWN;
     public Tri reverse = Tri.UNKNOWN;
 
+    /** The OBD adapter is connected (whether or not the car answers). */
+    public boolean obdLinked;
     /** Wall-clock millis of the last valid OBD data reply, 0 for never. */
     public long obdReplyMillis;
 
@@ -63,6 +65,7 @@ public final class VehicleState {
         c.bonnet = bonnet;
         c.handbrake = handbrake;
         c.reverse = reverse;
+        c.obdLinked = obdLinked;
         c.obdReplyMillis = obdReplyMillis;
         c.vin = vin;
         c.fuelUnsupported = fuelUnsupported;

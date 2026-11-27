@@ -175,6 +175,14 @@ public class HomeActivity extends Activity implements Widgets.Host {
             }
         });
         syncVehicle();
+        UnplugMonitor.shared().setListener(new Runnable() {
+            @Override
+            public void run() {
+                showBanners();
+            }
+        });
+        UnplugMonitor.shared().sync(this);
+        showBanners();
 
         // A setting, the wallpaper, or the set of installed apps may
         // have changed while we were away.
@@ -185,6 +193,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
             @Override
             public void run() {
                 rebuildIfChanged();
+                UnplugMonitor.shared().sync(HomeActivity.this);
             }
         });
         // ...and the wallpaper's colours can land after we have already
@@ -217,7 +226,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
         boolean want = Prefs.showVehicle(this) && layout != null
                 && (layout.hasItem(Kind.VEHICLE) || layout.hasItem(Kind.DOORS) || layout.hasItem(Kind.CHIPS));
         if (want && !vehicleOn) {
-            vehicle.start(this, vehicleListener, Prefs.vehicleMode(this));
+            vehicle.start(this, vehicleListener, Prefs.sourceMode(this));
             vehicleOn = true;
         } else if (!want && vehicleOn) {
             vehicle.stop(vehicleListener);
@@ -255,6 +264,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
         themeWatch = null;
         vehicle.stop(vehicleListener);
         vehicleOn = false;
+        UnplugMonitor.shared().setListener(null);
         if (nowPlaying != null) nowPlaying.stop();
         if (speed != null) speed.stop();
         trip.setListener(null);
@@ -365,6 +375,32 @@ public class HomeActivity extends Activity implements Widgets.Host {
         }
         widgets.refresh(Widgets.CLOCK | Widgets.NP | Widgets.WX | Widgets.VEH | Widgets.TRIP | Widgets.SPEED);
         syncVehicle();
+        showBanners();   // in the new colours
+    }
+
+    // ---- banners ----------------------------------------------------------------
+
+    private View unplugBanner;
+
+    /** Notices that sit over whichever page is showing. */
+    private void showBanners() {
+        boolean unplug = UnplugMonitor.shared().showing();
+        if (unplugBanner != null) {
+            shell.removeView(unplugBanner);
+            unplugBanner = null;
+        }
+        if (unplug) {
+            unplugBanner = Banners.unplug(this, m3, new Runnable() {
+                @Override
+                public void run() {
+                    UnplugMonitor.shared().dismiss();
+                }
+            });
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            lp.topMargin = Math.round(14 * density);
+            shell.addView(unplugBanner, lp);
+        }
     }
 
     // ---- edit mode --------------------------------------------------------------

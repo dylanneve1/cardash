@@ -199,6 +199,14 @@
     <string name="s_car_from_vin">From VIN: %1$s</string>
     <string name="s_car_chosen">Chosen: %1$s</string>
 
+    <string name="unplug_channel">OBD dongle reminder</string>
+    <string name="unplug_title">Unplug the OBD dongle</string>
+    <string name="unplug_text">Unplug the OBD dongle to avoid draining the battery</string>
+    <string name="s_unplug">Unplug reminder</string>
+    <string name="s_unplug_caption">Say so when the engine has been off for 3 minutes and a dongle is chosen</string>
+    <string name="s_on">On</string>
+    <string name="s_off">Off</string>
+
     <string name="s_bt">Bluetooth / OBD dongle</string>
     <string name="s_bt_caption">Search, pair and choose the OBD-II dongle</string>
     <string name="bt_title">Bluetooth</string>

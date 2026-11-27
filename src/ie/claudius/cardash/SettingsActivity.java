@@ -221,6 +221,9 @@ public class SettingsActivity extends Activity {
         card.addView(row(R.string.s_car_body, R.string.s_car_body_caption, Prefs.CAR_BODY, CarProfile.AUTO,
                 CarProfile.BODIES, new int[] { R.string.s_vehicle_auto, R.string.s_car_3door,
                         R.string.s_car_5door, R.string.s_car_estate, R.string.s_car_saloon }, false));
+        card.addView(divider());
+        card.addView(row(R.string.s_unplug, R.string.s_unplug_caption, Prefs.UNPLUG, "on",
+                new String[] { "on", "off" }, new int[] { R.string.s_on, R.string.s_off }, false));
         column.addView(card, cardParams(dp(16)));
 
         // ---- units ----

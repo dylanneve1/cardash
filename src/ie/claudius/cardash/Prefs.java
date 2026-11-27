@@ -89,6 +89,23 @@ public final class Prefs {
         prefs(ctx).edit().putString(key, value).apply();
     }
 
+    /** Remind to unplug the OBD dongle once the car is parked. */
+    public static final String UNPLUG = "unplug";   // on | off
+
+    public static boolean unplugReminder(Context ctx) {
+        return !"off".equals(get(ctx, UNPLUG, "on"));
+    }
+
+    /** True while the simulated vehicle stands in for the car (switched on in Diagnostics). */
+    public static boolean simulating(Context ctx) {
+        return false;
+    }
+
+    /** The mode the vehicle hub should run in. */
+    public static String sourceMode(Context ctx) {
+        return vehicleMode(ctx);
+    }
+
     // ---- OBD dongle -------------------------------------------------------
 
     /** The chosen dongle's Bluetooth address, or null when none was chosen. */

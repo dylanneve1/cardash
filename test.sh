@@ -16,6 +16,8 @@ javac -d "$OUT" \
   "$HERE"/src/ie/claudius/cardash/car/*.java \
   "$HERE/test/CarProfileTest.java" \
   "$HERE/test/CarGeometryTest.java" \
+  "$HERE/src/ie/claudius/cardash/vehicle/UnplugReminder.java" \
+  "$HERE/test/UnplugReminderTest.java" \
   "$HERE/src/ie/claudius/cardash/remote/RemoteForm.java" \
   "$HERE/src/ie/claudius/cardash/remote/QrCode.java" \
   "$HERE/src/ie/claudius/cardash/diag/ActivityTargets.java" \
@@ -37,6 +39,7 @@ java -cp "$OUT" ObdParseTest
 java -cp "$OUT" ObdReplyTest
 java -cp "$OUT" CarProfileTest
 java -cp "$OUT" CarGeometryTest
+java -cp "$OUT" UnplugReminderTest
 java -cp "$OUT" HcnParseTest
 java -cp "$OUT" RemoteFormTest
 java -cp "$OUT" QrCodeTest

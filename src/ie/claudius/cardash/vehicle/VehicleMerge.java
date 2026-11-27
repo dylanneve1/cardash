@@ -35,6 +35,7 @@ public final class VehicleMerge {
             m.bonnet = first(m.bonnet, s.bonnet);
             m.handbrake = first(m.handbrake, s.handbrake);
             m.reverse = first(m.reverse, s.reverse);
+            m.obdLinked |= s.obdLinked;
             m.obdReplyMillis = Math.max(m.obdReplyMillis, s.obdReplyMillis);
             if (m.vin == null) m.vin = s.vin;
             noFuel |= s.fuelUnsupported;

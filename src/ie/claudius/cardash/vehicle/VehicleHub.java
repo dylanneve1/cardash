@@ -67,6 +67,7 @@ public final class VehicleHub {
     private long rememberedAt;
     private Context appCtx;
     private String runningMode;
+    private String runningKey;
     private long lastUpdate;
 
     private VehicleHub() {}
@@ -80,11 +81,15 @@ public final class VehicleHub {
     public synchronized void start(Context ctx, VehicleState.Listener listener, String mode) {
         appCtx = ctx.getApplicationContext();
         if (!listeners.contains(listener)) listeners.add(listener);
+        // A different dongle counts as a different mode: the old socket must be dropped.
+        String key = mode + '|' + Prefs.obdAddress(appCtx);
         if (runningMode == null) {
             startSources(mode);
-        } else if (!runningMode.equals(mode)) {
+            runningKey = key;
+        } else if (!key.equals(runningKey)) {
             stopSources();
             startSources(mode);
+            runningKey = key;
         }
         if (merged.hasAnything()) listener.onVehicleState(merged);
     }

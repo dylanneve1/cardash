@@ -241,6 +241,7 @@ public final class ObdSource implements VehicleSource {
                 Log.w(TAG, "poll failed: " + e);
                 socketState = "poll failed: " + e.getMessage();
                 clearValues();
+                state.obdLinked = false;
                 publish(listener);
                 closeQuietly();
                 sleep(3000);
@@ -297,6 +298,8 @@ public final class ObdSource implements VehicleSource {
         supported = null;
         rate.reset();
         long lastData = System.currentTimeMillis();
+        state.obdLinked = true;
+        publish(listener);
         int multiFails = 0;
         boolean multiWorks = false;
         while (current()) {
