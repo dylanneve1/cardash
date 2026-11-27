@@ -104,6 +104,13 @@ public final class Prefs {
         return !"off".equals(get(ctx, UNPLUG, "on"));
     }
 
+    /** The car pop-up when a door, the boot or the bonnet opens. */
+    public static final String DOOR_OVERLAY = "door_overlay";   // on | off
+
+    public static boolean doorOverlay(Context ctx) {
+        return !"off".equals(get(ctx, DOOR_OVERLAY, "on"));
+    }
+
     /** The simulated vehicle: off by default, switched on in Diagnostics. */
     public static final String SIM = "sim";   // off | on
 
@@ -345,7 +352,7 @@ public final class Prefs {
     /** Everything that changes how the home screen is built, in one string. */
     public static String signature(Context ctx) {
         String[] keys = { SPEED, TEMP, CLOCK, SEED, SCRIM, MOTION, LAYOUT, HINT,
-                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE, SIDE, CAR_BODY, CAR_THEME, SIM };
+                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE, SIDE, CAR_BODY, CAR_THEME, SIM, DOOR_OVERLAY };
         StringBuilder sb = new StringBuilder();
         for (String k : keys) sb.append(get(ctx, k, "")).append('|');
         String layout = get(ctx, HOME_LAYOUT, "");

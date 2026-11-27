@@ -67,6 +67,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
 
     private final VehicleHub vehicle = VehicleHub.shared();
     private boolean vehicleOn;
+    private DoorOverlay doors;
     private String vehicleKey;
     /** The simulator can be switched on from adb while this screen shows. */
     private final SharedPreferences.OnSharedPreferenceChangeListener simSwitch =
@@ -117,6 +118,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
         Apps.seedIfEmpty(this);
         trip = new Trip(this);
         widgets = new Widgets(this, this);
+        doors = new DoorOverlay(this);
         shell = new FrameLayout(this);
         setContentView(shell);
         rebuild(true, true);
@@ -201,6 +203,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
             }
         });
         syncVehicle();
+        doors.resume();
         UnplugMonitor.shared().setListener(new Runnable() {
             @Override
             public void run() {
@@ -306,6 +309,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
         themeWatch = null;
         vehicle.stop(vehicleListener);
         vehicleOn = false;
+        doors.pause();
         UnplugMonitor.shared().setListener(null);
         Prefs.watch(this, simSwitch, false);
         if (nowPlaying != null) nowPlaying.stop();
@@ -428,6 +432,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
         }
         widgets.refresh(Widgets.CLOCK | Widgets.NP | Widgets.WX | Widgets.VEH | Widgets.TRIP | Widgets.SPEED);
         syncVehicle();
+        doors.sync();    // the source or the setting may have changed; new colours
         showBanners();   // in the new colours
     }
 

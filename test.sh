@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plain-JVM tests for the Android-free parts (ELM327 parsing, VIN and car profile, car drawing, unplug reminder, simulator, HCN/Raise frames, phone settings page, QR code, exported-activity launcher, clock fit, home layout model, Bluetooth device list).
+# Plain-JVM tests for the Android-free parts (ELM327 parsing, VIN and car profile, car drawing, unplug reminder, simulator, door pop-up, HCN/Raise frames, phone settings page, QR code, exported-activity launcher, clock fit, home layout model, Bluetooth device list).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/build/test"
@@ -20,6 +20,8 @@ javac -d "$OUT" \
   "$HERE/test/UnplugReminderTest.java" \
   "$HERE/src/ie/claudius/cardash/vehicle/SimVehicle.java" \
   "$HERE/test/SimVehicleTest.java" \
+  "$HERE/src/ie/claudius/cardash/vehicle/DoorWatch.java" \
+  "$HERE/test/DoorWatchTest.java" \
   "$HERE/src/ie/claudius/cardash/remote/RemoteForm.java" \
   "$HERE/src/ie/claudius/cardash/remote/QrCode.java" \
   "$HERE/src/ie/claudius/cardash/diag/ActivityTargets.java" \
@@ -43,6 +45,7 @@ java -cp "$OUT" CarProfileTest
 java -cp "$OUT" CarGeometryTest
 java -cp "$OUT" UnplugReminderTest
 java -cp "$OUT" SimVehicleTest
+java -cp "$OUT" DoorWatchTest
 java -cp "$OUT" HcnParseTest
 java -cp "$OUT" RemoteFormTest
 java -cp "$OUT" QrCodeTest

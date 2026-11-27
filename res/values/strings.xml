@@ -174,7 +174,7 @@
     <string name="edit_page_add">+ Page</string>
     <string name="edit_page_remove">Delete page</string>
     <string name="edit_page_empty">Empty page</string>
-    <string name="edit_page_vehicle">Car page (gauges, car, temperature)</string>
+    <string name="edit_page_vehicle">Car page (gauges, fuel, trip, temperature)</string>
     <string name="edit_page_remove_q">Delete this page and everything on it?</string>
     <string name="edit_page_clear_q">This is the only page. Clear everything on it?</string>
     <string name="edit_page_clear">Clear</string>
@@ -211,6 +211,20 @@
     <string name="s_car_unknown">Not known yet. Read from the VIN once the OBD dongle connects.</string>
     <string name="s_car_from_vin">From VIN: %1$s</string>
     <string name="s_car_chosen">Chosen: %1$s</string>
+
+    <string name="s_door_overlay">Door pop-up</string>
+    <string name="s_door_overlay_caption">Show the car over CarDash when a door, the boot or the bonnet opens</string>
+    <string name="door_front_left">Front left door</string>
+    <string name="door_front_right">Front right door</string>
+    <string name="door_rear_left">Rear left door</string>
+    <string name="door_rear_right">Rear right door</string>
+    <string name="door_boot">Boot</string>
+    <string name="door_bonnet">Bonnet</string>
+    <string name="door_one_open">%1$s open</string>
+    <string name="door_many_open">%1$d open</string>
+    <string name="door_all_closed">All closed</string>
+    <string name="door_no_data">No door data</string>
+    <string name="door_overlay_dismiss">Tap to dismiss</string>
 
     <string name="unplug_channel">OBD dongle reminder</string>
     <string name="unplug_title">Unplug the OBD dongle</string>

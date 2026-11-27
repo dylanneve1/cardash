@@ -28,12 +28,14 @@ public class AppListActivity extends Activity {
     private float density;
     private M3 m3;
     private boolean picking;
+    private DoorOverlay doors;
 
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         density = getResources().getDisplayMetrics().density;
         picking = getIntent().getBooleanExtra(EXTRA_PICK, false);
+        doors = new DoorOverlay(this);
         Motion.setCalm(Prefs.calmMotion(this));
         m3 = M3.fromSeed(Prefs.themeSeed(this));
 
@@ -103,6 +105,18 @@ public class AppListActivity extends Activity {
         }
 
         setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        doors.resume();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        doors.pause();
     }
 
     private View cell(final Apps.Entry e, int index) {

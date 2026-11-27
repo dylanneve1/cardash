@@ -95,13 +95,20 @@ public class HomeLayoutTest {
         HomeLayout vrt = HomeLayout.fromJson(vp.toJson());
         check(vrt != null && vrt.toJson().equals(vp.toJson()), "vehicle page round trip");
         check("5500".equals(vrt.pages.get(0).items.get(0).settings.get("warn")), "rpm gauge warns at 5500");
-        check("120".equals(vrt.pages.get(0).items.get(3).settings.get("max"))
-                && "110".equals(vrt.pages.get(0).items.get(3).settings.get("warn")), "coolant 0-120 warn 110");
+        check("120".equals(vrt.pages.get(0).items.get(2).settings.get("max"))
+                && "110".equals(vrt.pages.get(0).items.get(2).settings.get("warn")), "coolant 0-120 warn 110");
 
         // ---- default pages: car | home | information
         HomeLayout three = Defaults.full(classic(), 12, 8);
-        check(count(wrap(three.pages.get(0), 12, 8), Kind.DOORS) == 1
-                && count(wrap(three.pages.get(0), 12, 8), Kind.VEHICLE) == 5, "left page is the car");
+        check(count(wrap(three.pages.get(0), 12, 8), Kind.VEHICLE) == 5
+                && count(wrap(three.pages.get(0), 12, 8), Kind.TRIP) == 1, "left page is the car");
+        check(!three.hasItem(Kind.DOORS), "no car widget by default");
+        check(Kind.of(Kind.DOORS) != null && Arrange.place(wrap(new HomeLayout.Page(), 12, 8),
+                new HomeLayout.Page(), Kind.of(Kind.DOORS)) != null, "the car widget can still be added");
+        HomeLayout old = new HomeLayout(12, 8);
+        old.pages.add(new HomeLayout.Page());
+        old.pages.get(0).items.add(new HomeLayout.Item(Kind.DOORS, 4, 0, 4, 8));
+        check(HomeLayout.fromJson(old.toJson()).hasItem(Kind.DOORS), "a saved car widget is kept");
         check(wrap(three.pages.get(1), 12, 8).toJson().equals(d.toJson()), "centre page is the old home");
         check(count(wrap(three.pages.get(2), 12, 8), Kind.TRIP) == 1, "right page has the trip");
         HomeLayout noCar = Defaults.full(minimal, 12, 8);
