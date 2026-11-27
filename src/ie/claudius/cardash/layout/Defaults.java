@@ -87,18 +87,23 @@ public final class Defaults {
         return l;
     }
 
-    /** Car information: RPM, speed, coolant, fuel and outside temperature round the car. */
+    /**
+     * Car information: RPM, speed and coolant gauges over fuel, the trip
+     * meter (distance, time and average speed) and the outside temperature.
+     * The car drawing is not here: it pops up when a door opens, and can be
+     * added as a widget.
+     */
     public static HomeLayout.Page carPage(int cols, int rows) {
         HomeLayout t = new HomeLayout(TC, TR);
         HomeLayout.Page p = new HomeLayout.Page();
         t.pages.add(p);
         p.theme = HomeLayout.AUTO;
         p.items.add(vehicle("rpm", "gauge", 0, 0, 4, 4));
-        p.items.add(new HomeLayout.Item(Kind.DOORS, 4, 0, 4, 8));
-        p.items.add(vehicle("speed", "gauge", 8, 0, 4, 4));
-        p.items.add(vehicle("coolant", "gauge", 0, 4, 4, 4));
-        p.items.add(vehicle("fuel", "bar", 8, 4, 4, 2));
-        p.items.add(vehicle("outside", "bar", 8, 6, 4, 2));
+        p.items.add(vehicle("speed", "gauge", 4, 0, 4, 4));
+        p.items.add(vehicle("coolant", "gauge", 8, 0, 4, 4));
+        p.items.add(vehicle("fuel", "bar", 0, 4, 4, 4));
+        p.items.add(new HomeLayout.Item(Kind.TRIP, 4, 4, 4, 4));
+        p.items.add(vehicle("outside", "bar", 8, 4, 4, 4));
         t.rescale(cols, rows);
         return t.pages.get(0);
     }

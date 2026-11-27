@@ -28,7 +28,7 @@ final class ClassicCluster extends LinearLayout {
         setOrientation(VERTICAL);
         setGravity(Gravity.CENTER_HORIZONTAL);
         setBackgroundColor(BACKGROUND);
-        setPadding(dp(32), dp(14), dp(32), dp(editNote == null ? 22 : 90));
+        setPadding(dp(32), dp(14), dp(32), dp(22));
 
         LinearLayout top = row();
         heading = text(top, 34, WHITE, Gravity.START);

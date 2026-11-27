@@ -86,6 +86,7 @@ public final class RemoteForm {
                     "modern", "Modern", "classic", "Classic VW"),
             new Option("car_body", "auto", "Car body", false,
                     "auto", "Auto", "3door", "3-door", "5door", "5-door", "estate", "Estate", "saloon", "Saloon"),
+            new Option("door_overlay", "on", "Door pop-up", false, "on", "On", "off", "Off"),
             new Option("unplug", "on", "Unplug reminder", false, "on", "On", "off", "Off"),
             new Option("speed_unit", "kmh", "Speed", false, "kmh", "km/h", "mph", "mph"),
             new Option("temp_unit", "c", "Temperature", false, "c", "°C", "f", "°F"),

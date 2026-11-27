@@ -187,7 +187,8 @@ final class Widgets {
         t.setTextColor(m3.primary());
         t.setTypeface(Fonts.hero(ctx));
         t.setLetterSpacing(-0.03f);
-        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setGravity(Gravity.CENTER);
+        t.setCentreInk(true);
         t.setPadding(dp(20), dp(8), dp(20), dp(8));
         t.setRange(dp(24), dp(220));
         t.setBackground(Shapes.round(d, m3.surfaceContainer(), 36));
@@ -230,7 +231,7 @@ final class Widgets {
         final FitText t = new FitText(ctx);
         t.setTypeface(Fonts.body(ctx));
         t.setTextColor(m3.onSurfaceVariant());
-        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setGravity(Gravity.CENTER);
         t.setPadding(dp(20), dp(6), dp(20), dp(6));
         t.setRange(dp(12), dp(34));
         t.setBackground(Shapes.round(d, m3.surfaceContainer(), 28));

@@ -95,13 +95,20 @@ public class HomeLayoutTest {
         HomeLayout vrt = HomeLayout.fromJson(vp.toJson());
         check(vrt != null && vrt.toJson().equals(vp.toJson()), "vehicle page round trip");
         check("5500".equals(vrt.pages.get(0).items.get(0).settings.get("warn")), "rpm gauge warns at 5500");
-        check("120".equals(vrt.pages.get(0).items.get(3).settings.get("max"))
-                && "110".equals(vrt.pages.get(0).items.get(3).settings.get("warn")), "coolant 0-120 warn 110");
+        check("120".equals(vrt.pages.get(0).items.get(2).settings.get("max"))
+                && "110".equals(vrt.pages.get(0).items.get(2).settings.get("warn")), "coolant 0-120 warn 110");
 
         // ---- default pages: car | home | information
         HomeLayout three = Defaults.full(classic(), 12, 8);
-        check(count(wrap(three.pages.get(0), 12, 8), Kind.DOORS) == 1
-                && count(wrap(three.pages.get(0), 12, 8), Kind.VEHICLE) == 5, "left page is the car");
+        check(count(wrap(three.pages.get(0), 12, 8), Kind.VEHICLE) == 5
+                && count(wrap(three.pages.get(0), 12, 8), Kind.TRIP) == 1, "left page is the car");
+        check(!three.hasItem(Kind.DOORS), "no car widget by default");
+        check(Kind.of(Kind.DOORS) != null && Arrange.place(wrap(new HomeLayout.Page(), 12, 8),
+                new HomeLayout.Page(), Kind.of(Kind.DOORS)) != null, "the car widget can still be added");
+        HomeLayout old = new HomeLayout(12, 8);
+        old.pages.add(new HomeLayout.Page());
+        old.pages.get(0).items.add(new HomeLayout.Item(Kind.DOORS, 4, 0, 4, 8));
+        check(HomeLayout.fromJson(old.toJson()).hasItem(Kind.DOORS), "a saved car widget is kept");
         check(wrap(three.pages.get(1), 12, 8).toJson().equals(d.toJson()), "centre page is the old home");
         check(count(wrap(three.pages.get(2), 12, 8), Kind.TRIP) == 1, "right page has the trip");
         HomeLayout noCar = Defaults.full(minimal, 12, 8);
@@ -186,6 +193,24 @@ public class HomeLayoutTest {
         check(sz[0] == 2 && sz[1] == 1, "resize never goes below the kind minimum: " + sz[0] + "x" + sz[1]);
         sz = Arrange.resize(l, p, w, 99, 99);
         check(sz[0] == 8 && sz[1] == 8, "resize stops at the grid edge: " + sz[0] + "x" + sz[1]);
+        // Arrow nudges: one cell, hopping over a neighbour, stopping at the edge.
+        int[] nu = Arrange.nudge(l, p, c, 0, 1);
+        check(nu != null && nu[0] == 0 && nu[1] == 1, "nudge down one cell");
+        nu = Arrange.nudge(l, p, c, 1, 0);
+        check(nu != null && nu[0] == 8 && nu[1] == 0, "nudge right hops over the neighbour");
+        check(Arrange.nudge(l, p, c, -1, 0) == null && Arrange.nudge(l, p, c, 0, -1) == null
+                && Arrange.nudge(l, p, c, 0, 0) == null, "nudge stops at the edge");
+        // Width and height buttons.
+        check(Arrange.step(l, p, c, 1, 0) == null, "cannot widen into a neighbour");
+        int[] stp = Arrange.step(l, p, c, 0, 1);
+        check(stp != null && stp[0] == 4 && stp[1] == 3, "one taller");
+        stp = Arrange.step(l, p, c, -1, 0);
+        check(stp != null && stp[0] == 3, "one narrower");
+        c.w = 2;
+        c.h = 1;
+        check(Arrange.step(l, p, c, -1, 0) == null && Arrange.step(l, p, c, 0, -1) == null, "not under the minimum");
+        c.w = 4;
+        c.h = 2;
         // Fill the page, then there is no room.
         HomeLayout f = new HomeLayout(2, 2);
         HomeLayout.Page fp = new HomeLayout.Page();

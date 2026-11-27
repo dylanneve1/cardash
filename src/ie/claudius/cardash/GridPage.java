@@ -6,6 +6,7 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -24,10 +25,12 @@ import ie.claudius.cardash.layout.Kind;
 
 /**
  * One home page: lays every item of a layout page out on the grid. In
- * edit mode each item is wrapped in a frame that can be dragged (snaps
- * to cells, never onto a neighbour), resized from its corner handle,
- * opened for settings (gear) or removed (X); the grid is drawn and a
- * ghost shows where a drop will land.
+ * edit mode a tap selects an item (outlined); the selected one can be
+ * dragged (snaps to cells, never onto a neighbour) or, while resizing,
+ * pulled by its corner handle. Everything else that acts on it is on
+ * the editor's toolbar. A tap on empty space deselects and a long press
+ * there adds something; the grid is drawn and a ghost shows where a drop
+ * will land.
  */
 final class GridPage extends ViewGroup {
 
@@ -36,15 +39,21 @@ final class GridPage extends ViewGroup {
     }
 
     interface Edit {
-        void gear(Item it);
-        void remove(Item it);
+        /** The selected item, or null. */
+        Item selected();
+        /** True while the selection is being resized: it shows a corner handle. */
+        boolean resizing();
+        /** Select an item, or nothing (null). */
+        void select(Item it);
+        /** Empty space was long-pressed. */
+        void addHere();
         /** An item moved ({@code structural} false) or resized ({@code true}: views need rebuilding). */
         void changed(boolean structural);
         /** Drag started/ended: the toolbar steps aside. */
         void dragging(boolean on);
     }
 
-    static final int BUTTON_DP = 48;
+    private static final int HANDLE_DP = 48;
 
     private final HomeLayout layout;
     final HomeLayout.Page page;
@@ -87,6 +96,26 @@ final class GridPage extends ViewGroup {
         hint.setTextAlign(Paint.Align.CENTER);
         hint.setTextSize(18 * d);
         hint.setTypeface(Fonts.body(ctx));
+        if (editing) {
+            setOnClickListener(new OnClickListener() {
+                @Override public void onClick(View v) { GridPage.this.edit.select(null); }
+            });
+            setOnLongClickListener(new OnLongClickListener() {
+                @Override public boolean onLongClick(View v) {
+                    v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                    GridPage.this.edit.addHere();
+                    return true;
+                }
+            });
+        }
+    }
+
+    /** The selection or the resize mode changed: restyle the frames. */
+    void refreshSelection() {
+        for (int i = 0; i < getChildCount(); i++) {
+            View c = getChildAt(i);
+            if (c instanceof EditFrame) ((EditFrame) c).refresh();
+        }
     }
 
     private int dp(float v) { return Math.round(v * d); }
@@ -169,11 +198,13 @@ final class GridPage extends ViewGroup {
 
     // ---- the edit frame -------------------------------------------------------
 
-    /** Wraps one item in edit mode: shield (drag), gear, X and resize handle. */
+    /** Wraps one item in edit mode: a shield that selects and drags, and the resize handle. */
     private final class EditFrame extends FrameLayout {
         final Item item;
         float sx, sy;
-        boolean dragging;
+        boolean dragging, tap;
+        private final View shield;
+        private final ImageView handle;
 
         EditFrame(Context ctx, final Item it, View content) {
             super(ctx);
@@ -181,34 +212,25 @@ final class GridPage extends ViewGroup {
             setClipChildren(false);
             addView(content, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-            View shield = new View(ctx);
-            GradientDrawable g = new GradientDrawable();
-            g.setCornerRadius(24 * d);
-            g.setColor(0x40000000);
-            g.setStroke(dp(2), M3.withAlpha(m3.primary(), 0xCC));
-            shield.setBackground(g);
+            shield = new View(ctx);
             shield.setClickable(true);
+            Kind k = Kind.of(it.type);
+            shield.setContentDescription(k == null ? it.type : k.label);
             addView(shield, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             shield.setOnTouchListener(new OnTouchListener() {
                 @Override public boolean onTouch(View v, MotionEvent e) { return drag(e); }
             });
-
-            int bs = dp(BUTTON_DP);
-            Kind k = Kind.of(it.type);
-            if (k != null && !k.options.isEmpty()) {
-                ImageView gear = button(Glyph.Kind.GEAR, ctx.getString(R.string.settings));
-                gear.setOnClickListener(new OnClickListener() {
-                    @Override public void onClick(View v) { edit.gear(it); }
-                });
-                addView(gear, new LayoutParams(bs, bs, Gravity.TOP | Gravity.START));
-            }
-            ImageView x = button(Glyph.Kind.CLOSE, ctx.getString(R.string.remove));
-            x.setOnClickListener(new OnClickListener() {
-                @Override public void onClick(View v) { edit.remove(it); }
+            // Accessibility and keyboard clicks do not come through the touch listener.
+            shield.setOnClickListener(new OnClickListener() {
+                @Override public void onClick(View v) { edit.select(item); }
             });
-            addView(x, new LayoutParams(bs, bs, Gravity.TOP | Gravity.END));
 
-            ImageView handle = button(Glyph.Kind.RESIZE, ctx.getString(R.string.resize));
+            handle = new ImageView(ctx);
+            handle.setImageDrawable(new Glyph(Glyph.Kind.RESIZE, m3.onPrimary()));
+            handle.setBackground(Shapes.dot(d, m3.primary(), m3.onPrimary(), 2));
+            handle.setPadding(dp(10), dp(10), dp(10), dp(10));
+            handle.setContentDescription(ctx.getString(R.string.resize));
+            handle.setClickable(true);
             handle.setOnTouchListener(new OnTouchListener() {
                 float hx, hy;
                 @Override public boolean onTouch(View v, MotionEvent e) {
@@ -222,15 +244,19 @@ final class GridPage extends ViewGroup {
                             ghost = resizeGhost(it, e.getRawX() - hx, e.getRawY() - hy);
                             invalidateGrid();
                             return true;
-                        case MotionEvent.ACTION_UP:
-                            if (ghost != null) {
-                                it.w = ghost[2];
-                                it.h = ghost[3];
-                            }
+                        case MotionEvent.ACTION_UP: {
+                            int[] g = ghost;
                             ghost = null;
                             edit.dragging(false);
+                            if (g == null || (g[2] == it.w && g[3] == it.h)) {
+                                invalidateGrid();
+                                return true;
+                            }
+                            it.w = g[2];
+                            it.h = g[3];
                             edit.changed(true);
                             return true;
+                        }
                         case MotionEvent.ACTION_CANCEL:
                             ghost = null;
                             edit.dragging(false);
@@ -241,33 +267,40 @@ final class GridPage extends ViewGroup {
                     }
                 }
             });
-            addView(handle, new LayoutParams(bs, bs, Gravity.BOTTOM | Gravity.END));
+            addView(handle, new LayoutParams(dp(HANDLE_DP), dp(HANDLE_DP), Gravity.BOTTOM | Gravity.END));
+            refresh();
         }
 
-        private ImageView button(Glyph.Kind kind, String description) {
-            ImageView b = new ImageView(getContext());
-            b.setImageDrawable(new Glyph(kind, m3.onPrimaryContainer()));
-            b.setBackground(Shapes.dot(d, m3.primaryContainer(), m3.primary(), 2));
-            b.setPadding(dp(11), dp(11), dp(11), dp(11));
-            b.setContentDescription(description);
-            b.setClickable(true);
-            return b;
+        void refresh() {
+            boolean on = edit.selected() == item;
+            GradientDrawable g = new GradientDrawable();
+            g.setCornerRadius(24 * d);
+            g.setColor(on ? M3.withAlpha(m3.primary(), 0x38) : 0x40000000);
+            g.setStroke(dp(on ? 5 : 1), on ? m3.primary() : M3.withAlpha(m3.onSurface(), 0x59));
+            shield.setBackground(g);
+            shield.setSelected(on);
+            handle.setVisibility(on && edit.resizing() ? VISIBLE : GONE);
         }
 
+        /** A tap selects; only the selected item follows a drag. */
         private boolean drag(MotionEvent e) {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     sx = e.getRawX(); sy = e.getRawY();
                     dragging = false;
+                    tap = true;
                     return true;
                 case MotionEvent.ACTION_MOVE: {
                     float dx = e.getRawX() - sx, dy = e.getRawY() - sy;
                     int slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
-                    if (!dragging && Math.hypot(dx, dy) > slop) {
-                        dragging = true;
-                        requestDisallow(true);
-                        bringToFront();
-                        edit.dragging(true);
+                    if (tap && Math.hypot(dx, dy) > slop) {
+                        tap = false;
+                        if (edit.selected() == item) {
+                            dragging = true;
+                            requestDisallow(true);
+                            bringToFront();
+                            edit.dragging(true);
+                        }
                     }
                     if (dragging) {
                         setTranslationX(dx);
@@ -280,7 +313,9 @@ final class GridPage extends ViewGroup {
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
                     if (dragging) drop(e.getActionMasked() == MotionEvent.ACTION_UP);
+                    else if (tap && e.getActionMasked() == MotionEvent.ACTION_UP) edit.select(item);
                     dragging = false;
+                    tap = false;
                     return true;
                 default:
                     return true;

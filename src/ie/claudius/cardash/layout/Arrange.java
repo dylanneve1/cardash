@@ -65,6 +65,32 @@ public final class Arrange {
     }
 
     /**
+     * Where the arrow buttons move an item: the first free position going
+     * in the direction (dx, dy), hopping over whatever is in the way.
+     * Null when there is none before the grid edge.
+     */
+    public static int[] nudge(HomeLayout l, HomeLayout.Page p, HomeLayout.Item it, int dx, int dy) {
+        if (dx == 0 && dy == 0) return null;
+        for (int x = it.x + dx, y = it.y + dy; inBounds(l, x, y, it.w, it.h); x += dx, y += dy) {
+            if (free(l, p, it, x, y, it.w, it.h)) return new int[] { x, y };
+        }
+        return null;
+    }
+
+    /**
+     * The size after one press of a width or height button, the top-left
+     * corner staying put. Null when the kind's minimum, the grid edge or a
+     * neighbour forbids it.
+     */
+    public static int[] step(HomeLayout l, HomeLayout.Page p, HomeLayout.Item it, int dw, int dh) {
+        Kind k = Kind.of(it.type);
+        int w = it.w + dw, h = it.h + dh;
+        if (dw < 0 && w < (k == null ? 1 : k.minW)) return null;
+        if (dh < 0 && h < (k == null ? 1 : k.minH)) return null;
+        return free(l, p, it, it.x, it.y, w, h) ? new int[] { w, h } : null;
+    }
+
+    /**
      * A new item of {@code kind} in the first free spot, at its default
      * size or the largest smaller size that fits. Null when the page is full.
      */

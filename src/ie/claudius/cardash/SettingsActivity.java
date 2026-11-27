@@ -38,12 +38,14 @@ public class SettingsActivity extends Activity {
     private View page;
     private Object themeWatch;
     private int builtSeed;
+    private DoorOverlay doors;
     private LinearLayout presetGroup;
 
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         density = getResources().getDisplayMetrics().density;
+        doors = new DoorOverlay(this);
         shell = new FrameLayout(this);
         setContentView(shell);
         rebuild(true);
@@ -65,6 +67,7 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        doors.resume();
         // A phone on the LAN changed something: show it here too.
         RemoteServer.setListener(new Runnable() {
             @Override
@@ -77,6 +80,7 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        doors.pause();
         RemoteServer.setListener(null);
     }
 
@@ -224,6 +228,9 @@ public class SettingsActivity extends Activity {
         card.addView(row(R.string.s_car_body, R.string.s_car_body_caption, Prefs.CAR_BODY, CarProfile.AUTO,
                 CarProfile.BODIES, new int[] { R.string.s_vehicle_auto, R.string.s_car_3door,
                         R.string.s_car_5door, R.string.s_car_estate, R.string.s_car_saloon }, false));
+        card.addView(divider());
+        card.addView(row(R.string.s_door_overlay, R.string.s_door_overlay_caption, Prefs.DOOR_OVERLAY, "on",
+                new String[] { "on", "off" }, new int[] { R.string.s_on, R.string.s_off }, false));
         card.addView(divider());
         card.addView(row(R.string.s_unplug, R.string.s_unplug_caption, Prefs.UNPLUG, "on",
                 new String[] { "on", "off" }, new int[] { R.string.s_on, R.string.s_off }, false));

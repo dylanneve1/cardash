@@ -59,12 +59,15 @@ public class HomeActivity extends Activity implements Widgets.Host {
 
     private HomeLayout layout;
     private HomeEditor editor;
+    /** The grid pages on screen (classic cluster pages are not among them). */
+    private final List<GridPage> grids = new ArrayList<>();
     /** The page showing; -1 until the first build picks the layout's start page. */
     private int pageIndex = -1;
     private String editBaseSig;
 
     private final VehicleHub vehicle = VehicleHub.shared();
     private boolean vehicleOn;
+    private DoorOverlay doors;
     private String vehicleKey;
     /** The simulator can be switched on from adb while this screen shows. */
     private final SharedPreferences.OnSharedPreferenceChangeListener simSwitch =
@@ -115,6 +118,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
         Apps.seedIfEmpty(this);
         trip = new Trip(this);
         widgets = new Widgets(this, this);
+        doors = new DoorOverlay(this);
         shell = new FrameLayout(this);
         setContentView(shell);
         rebuild(true, true);
@@ -199,6 +203,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
             }
         });
         syncVehicle();
+        doors.resume();
         UnplugMonitor.shared().setListener(new Runnable() {
             @Override
             public void run() {
@@ -304,6 +309,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
         themeWatch = null;
         vehicle.stop(vehicleListener);
         vehicleOn = false;
+        doors.pause();
         UnplugMonitor.shared().setListener(null);
         Prefs.watch(this, simSwitch, false);
         if (nowPlaying != null) nowPlaying.stop();
@@ -355,7 +361,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
         layout = editor != null ? editor.working : LayoutStore.load(this);
         if (editor != null) {
             // Same working copy, new colours.
-            editor = new HomeEditor(this, m3, editor.working, editor.originalJson());
+            editor = new HomeEditor(this, m3, editor.working, editor.originalJson(), editor.state);
         }
         if (pageIndex < 0) pageIndex = layout.start;
         pageIndex = Math.max(0, Math.min(pageIndex, layout.pages.size() - 1));
@@ -367,6 +373,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
 
         List<View> pages = new ArrayList<>();
         final boolean editing = editor != null;
+        grids.clear();
         for (HomeLayout.Page p : layout.pages) {
             if (p.classic(Prefs.carTheme(this))) {
                 pages.add(widgets.classicCluster(editing));
@@ -389,24 +396,28 @@ public class HomeActivity extends Activity implements Widgets.Host {
                     }
                 });
             }
+            grids.add(gp);
             pages.add(gp);
         }
         pager = new HomePager(this, new HomePager.Listener() {
             @Override public void onSwipeUp() { openApps(); }
             @Override public void onPage(int index) {
                 pageIndex = index;
-                if (editor != null) editor.label();
+                if (editor != null) editor.pageChanged();
             }
         }, m3.primary(), M3.withAlpha(m3.onSurfaceVariant(), 0x66));
         pager.setPages(pages, pageIndex);
         pager.setSwipes(!editing);
-        page.addView(pager, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        // In edit mode the grid ends above the toolbar, so nothing is ever underneath it.
+        if (editing) plp.bottomMargin = Math.round(HomeEditor.BAR_SPACE_DP * density);
+        page.addView(pager, plp);
         if (editing) {
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                     Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-            lp.bottomMargin = Math.round(14 * density);
+            lp.bottomMargin = Math.round(6 * density);
             page.addView(editor.toolbar(), lp);
         }
 
@@ -421,6 +432,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
         }
         widgets.refresh(Widgets.CLOCK | Widgets.NP | Widgets.WX | Widgets.VEH | Widgets.TRIP | Widgets.SPEED);
         syncVehicle();
+        doors.sync();    // the source or the setting may have changed; new colours
         showBanners();   // in the new colours
     }
 
@@ -476,7 +488,8 @@ public class HomeActivity extends Activity implements Widgets.Host {
     public void enterEdit() {
         if (editor != null) return;
         editBaseSig = layoutSig();
-        editor = new HomeEditor(this, M3.fromSeed(Prefs.themeSeed(this)), layout.copy(), null);
+        editor = new HomeEditor(this, M3.fromSeed(Prefs.themeSeed(this)), layout.copy(), null,
+                new HomeEditor.State());
         rebuild(false, true);
         Toast.makeText(this, R.string.edit_hint, Toast.LENGTH_LONG).show();
     }
@@ -484,6 +497,19 @@ public class HomeActivity extends Activity implements Widgets.Host {
     /** Structure changed in edit mode (item added, removed, resized, or its settings changed). */
     void rebuildEditing() {
         if (editor != null) rebuild(false, false);
+    }
+
+    /** The editor's selection changed. */
+    void refreshSelection() {
+        for (GridPage g : grids) g.refreshSelection();
+    }
+
+    /** An item moved in edit mode: same views, new places. */
+    void relayoutEditing() {
+        for (GridPage g : grids) {
+            g.requestLayout();
+            g.invalidate();
+        }
     }
 
     void exitEdit(boolean save) {
