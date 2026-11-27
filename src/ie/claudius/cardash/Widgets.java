@@ -19,6 +19,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import ie.claudius.cardash.car.Compass;
 import ie.claudius.cardash.dash.Speedo;
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.layout.HomeLayout.Item;
@@ -36,7 +37,7 @@ import ie.claudius.cardash.vehicle.VehicleState;
  */
 final class Widgets {
 
-    static final int CLOCK = 1, NP = 2, WX = 4, VEH = 8, TRIP = 16, SPEED = 32;
+    static final int CLOCK = 1, NP = 2, WX = 4, VEH = 8, TRIP = 16, SPEED = 32, HEADING = 64;
 
     /** A built widget that can redraw itself from the shared live state. */
     private abstract static class Live {
@@ -72,6 +73,8 @@ final class Widgets {
     VehicleState lastVehicle;
     float lastKph;
     boolean lastFix;
+    /** Direction of travel, or negative while unknown. */
+    float heading = -1f;
 
     Widgets(Context ctx, Host host) {
         this.ctx = ctx;
@@ -129,6 +132,51 @@ final class Widgets {
                 }
             });
         }
+        return v;
+    }
+
+    // ---- the classic cluster page ---------------------------------------------------
+
+    View classicCluster(boolean editing) {
+        final ClassicCluster v = new ClassicCluster(ctx,
+                editing ? ctx.getString(R.string.classic_edit_note) : null);
+        add(new Live(CLOCK | HEADING | VEH | TRIP) {
+            @Override void refresh() {
+                Motion.setText(v.time, new SimpleDateFormat(Prefs.clockPattern(ctx), Locale.getDefault())
+                        .format(new Date()));
+                Motion.setText(v.heading, heading < 0 ? "—" : Compass.point(heading));
+                VehicleState s = lastVehicle != null ? lastVehicle : new VehicleState();
+                v.car.setThreeDoor(Prefs.carProfile(ctx).threeDoor());
+                v.car.setState(s);
+                int u = VehicleState.UNKNOWN_INT;
+                String t = s.outsideC != u ? temperature(s.outsideC)
+                        : s.intakeC != u ? temperature(s.intakeC) + " " + ctx.getString(R.string.intake_label)
+                        : "—";
+                Motion.setText(v.temperature, "\u2744\uFE0E  " + t);
+                boolean miles = Prefs.mph(ctx);
+                String unit = miles ? " mi" : " km";
+                Motion.setText(v.odometer, "Odo " + (s.odometerKm == u ? "—"
+                        : (miles ? Math.round(s.odometerKm / 1.609344f) : s.odometerKm) + unit));
+                Trip tr = host.trip();
+                Motion.setText(v.trip, "Trip " + (tr == null ? "—" : Trip.distance(tr.metres(), miles) + unit));
+                // The same default limits as the gauges.
+                StringBuilder warn = new StringBuilder();
+                if (s.coolantC != u && s.coolantC >= Kind.vehicleRange("coolant")[2]) {
+                    warn.append("Coolant ").append(temperature(s.coolantC)).append("   ");
+                }
+                if (s.rpm != u && s.rpm >= Kind.vehicleRange("rpm")[2]) warn.append(s.rpm).append(" rpm");
+                Motion.setText(v.warning, warn.toString().trim());
+                v.warning.setVisibility(warn.length() == 0 ? View.GONE : View.VISIBLE);
+            }
+        }).refresh();
+        v.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View view) {
+                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                host.enterEdit();
+                return true;
+            }
+        });
         return v;
     }
 

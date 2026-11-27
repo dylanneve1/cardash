@@ -18,6 +18,7 @@ import ie.claudius.cardash.car.CarProfile;
 import ie.claudius.cardash.car.Vin;
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.diag.DiagnosticsActivity;
+import ie.claudius.cardash.layout.HomeLayout;
 import ie.claudius.cardash.remote.QrView;
 import ie.claudius.cardash.remote.RemoteServer;
 
@@ -214,6 +215,8 @@ public class SettingsActivity extends Activity {
 
         // ---- the car ----
         card = card();
+        card.addView(carThemeRow());
+        card.addView(divider());
         card.addView(carRow(R.string.s_car_make, Prefs.CAR_MAKE));
         card.addView(divider());
         card.addView(carRow(R.string.s_car_model, Prefs.CAR_MODEL));
@@ -543,6 +546,33 @@ public class SettingsActivity extends Activity {
             group.addView(dot, lp);
         }
         row.addView(hs);
+        return row;
+    }
+
+    /** Not a plain pref: choosing also brings a saved layout's car pages back in line. */
+    private View carThemeRow() {
+        LinearLayout row = rowShell(R.string.s_car_theme, R.string.s_car_theme_caption);
+        final LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.HORIZONTAL);
+        final String[] values = { HomeLayout.MODERN, HomeLayout.CLASSIC };
+        int[] labels = { R.string.s_car_theme_modern, R.string.s_car_theme_classic };
+        for (int i = 0; i < values.length; i++) {
+            final String value = values[i];
+            final TextView opt = pill(getString(labels[i]), value.equals(Prefs.carTheme(this)));
+            opt.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    LayoutStore.setCarTheme(SettingsActivity.this, value);
+                    for (int j = 0; j < group.getChildCount(); j++) {
+                        TextView o = (TextView) group.getChildAt(j);
+                        style(o, o == opt);
+                    }
+                    Motion.pop(opt);
+                }
+            });
+            group.addView(opt);
+        }
+        row.addView(group);
         return row;
     }
 

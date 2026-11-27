@@ -80,6 +80,8 @@ public final class RemoteForm {
                     "full", "Full", "compact", "Compact", "hide", "Hide"),
             new Option("vehicle", "auto", "Vehicle data", true,
                     "auto", "Auto", "obd", "OBD", "can", "CAN", "off", "Off"),
+            new Option("car_theme", "modern", "Car page style", false,
+                    "modern", "Modern", "classic", "Classic VW"),
             new Option("car_body", "auto", "Car body", false,
                     "auto", "Auto", "3door", "3-door", "5door", "5-door", "estate", "Estate", "saloon", "Saloon"),
             new Option("unplug", "on", "Unplug reminder", false, "on", "On", "off", "Off"),

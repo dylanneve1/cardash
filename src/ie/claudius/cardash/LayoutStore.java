@@ -91,6 +91,18 @@ public final class LayoutStore {
         return p;
     }
 
+    /**
+     * The car page style chosen in Settings: car pages of a saved layout
+     * go back to following it.
+     */
+    public static void setCarTheme(Context ctx, String theme) {
+        Prefs.set(ctx, Prefs.CAR_THEME, theme);
+        HomeLayout saved = HomeLayout.fromJson(Prefs.get(ctx, Prefs.HOME_LAYOUT, null));
+        if (saved == null) return;
+        for (HomeLayout.Page p : saved.pages) if (p.isCarPage()) p.theme = HomeLayout.AUTO;
+        save(ctx, saved);
+    }
+
     /** Sanity: a layout the editor produced must be valid; repair if not. */
     public static void check(HomeLayout l) {
         if (!Arrange.valid(l)) Arrange.repair(l);

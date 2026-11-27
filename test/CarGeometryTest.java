@@ -1,4 +1,5 @@
 import ie.claudius.cardash.car.CarGeometry;
+import ie.claudius.cardash.car.Compass;
 
 /** The car drawing keeps the approved design's proportions, and parts open the right way. */
 public class CarGeometryTest {
@@ -54,6 +55,9 @@ public class CarGeometryTest {
             inBounds(CarGeometry.door(side, three, 1f), "long door");
             inBounds(CarGeometry.door(side, r, 1f), "rear door");
         }
+
+        check("N".equals(Compass.point(0)) && "NE".equals(Compass.point(47)) && "N".equals(Compass.point(350))
+                && "W".equals(Compass.point(-90)) && "S".equals(Compass.point(540)), "compass points");
 
         if (failures > 0) {
             System.out.println(failures + " failures");

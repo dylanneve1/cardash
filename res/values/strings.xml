@@ -207,6 +207,14 @@
     <string name="s_on">On</string>
     <string name="s_off">Off</string>
 
+    <string name="s_car_theme">Car page style</string>
+    <string name="s_car_theme_caption">Gauges round the car, or a monochrome cluster screen</string>
+    <string name="s_car_theme_modern">Modern</string>
+    <string name="s_car_theme_classic">Classic VW</string>
+    <string name="edit_style">Style</string>
+    <string name="edit_style_title">Page style</string>
+    <string name="classic_edit_note">Classic VW style. Choose Style → Modern to edit this page\'s widgets.</string>
+
     <string name="s_bt">Bluetooth / OBD dongle</string>
     <string name="s_bt_caption">Search, pair and choose the OBD-II dongle</string>
     <string name="bt_title">Bluetooth</string>

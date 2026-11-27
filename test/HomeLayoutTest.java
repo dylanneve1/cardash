@@ -110,6 +110,14 @@ public class HomeLayoutTest {
         check(HomeLayout.fromJson(d.toJson().replace("\"start\":0", "\"start\":9")).start == 0, "start clamped");
         check(HomeLayout.fromJson("{\"cols\":12,\"rows\":8,\"pages\":[{},{}]}").start == 0,
                 "a layout saved before start pages opens on the first");
+        HomeLayout.Page carPage = three.pages.get(0);
+        check("auto".equals(carPage.theme) && !carPage.classic("modern") && carPage.classic("classic"),
+                "the car page follows Settings");
+        carPage.theme = HomeLayout.CLASSIC;
+        check(HomeLayout.fromJson(three.toJson()).pages.get(0).classic("modern")
+                && three.copy().pages.get(0).classic("modern"), "a per-page style persists and wins");
+        check(!three.pages.get(1).classic("classic") && !three.pages.get(1).isCarPage()
+                && carPage.isCarPage(), "other pages are not car pages");
         three.insertPage(0, new HomeLayout.Page());
         check(three.start == 2, "inserting before keeps the start page");
         three.removePage(0);

@@ -36,6 +36,8 @@ public final class CarView extends android.view.View {
     private boolean threeDoor;
     private boolean caption = true;
     private boolean shownOnce;
+    /** White only: open parts are told apart by their swing and weight, not colour. */
+    private boolean monochrome;
 
     /** @param background the colour behind the car: used to cut the gap an open door leaves */
     public CarView(Context ctx, int background) {
@@ -54,6 +56,15 @@ public final class CarView extends android.view.View {
     public void setCaption(boolean on) {
         caption = on;
         invalidate();
+    }
+
+    public void setMonochrome(boolean on) {
+        monochrome = on;
+        invalidate();
+    }
+
+    private int openColor() {
+        return monochrome ? 0xFFFFFFFF : OPEN;
     }
 
     public void setThreeDoor(boolean value) {
@@ -124,7 +135,7 @@ public final class CarView extends android.view.View {
         stroke(c, CarGeometry.inner(), true, DIM, 1.4f * k);
         stroke(c, CarGeometry.bonnetLine(), false, LINE, 2f * k);
         if (open[BONNET] > 0f) {
-            int col = fade(OPEN, open[BONNET]);
+            int col = fade(openColor(), open[BONNET]);
             stroke(c, CarGeometry.bonnetPanel(), true, col, 2.4f * k);
             stroke(c, CarGeometry.bonnetLine(), false, col, 2.2f * k);
         }
@@ -134,7 +145,7 @@ public final class CarView extends android.view.View {
         stroke(c, CarGeometry.rearWindow(), true, LINE, 2f * k);
 
         if (open[BOOT] > 0f) {
-            stroke(c, CarGeometry.tailgate(open[BOOT]), true, fade(OPEN, open[BOOT]), 2.6f * k);
+            stroke(c, CarGeometry.tailgate(open[BOOT]), true, fade(openColor(), open[BOOT]), 2.6f * k);
         }
         if (open[BOOT] < 1f) {
             line.setPathEffect(parts[BOOT] == VehicleState.Tri.UNKNOWN ? dashes() : null);
@@ -155,7 +166,7 @@ public final class CarView extends android.view.View {
         if (caption) {
             String t = summary();
             text.setTextSize(label);
-            text.setColor(anyOpen() ? OPEN : DIM);
+            text.setColor(anyOpen() ? openColor() : DIM);
             c.drawText(t, w / 2f, h - 8 * d, text);
         }
     }
@@ -175,7 +186,7 @@ public final class CarView extends android.view.View {
             stroke(c, new float[] { x, span[0] + 2, x, span[1] - 2 }, false, DIM, 1.6f * k);
             line.setPathEffect(null);
         } else if (p > 0f) {
-            stroke(c, CarGeometry.door(side, span, p), true, fade(OPEN, Math.min(1f, 0.3f + p)), 2.6f * k);
+            stroke(c, CarGeometry.door(side, span, p), true, fade(openColor(), Math.min(1f, 0.3f + p)), (monochrome ? 3.4f : 2.6f) * k);
         } else {
             stroke(c, new float[] { x - side * 3, span[0], x + side * 1.5f, span[0] }, false, DIM, 1.4f * k);
             stroke(c, new float[] { x - side * 3, span[1], x + side * 1.5f, span[1] }, false, DIM, 1.4f * k);

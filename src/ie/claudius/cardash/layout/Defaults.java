@@ -92,6 +92,7 @@ public final class Defaults {
         HomeLayout t = new HomeLayout(TC, TR);
         HomeLayout.Page p = new HomeLayout.Page();
         t.pages.add(p);
+        p.theme = HomeLayout.AUTO;
         p.items.add(vehicle("rpm", "gauge", 0, 0, 4, 4));
         p.items.add(new HomeLayout.Item(Kind.DOORS, 4, 0, 4, 8));
         p.items.add(vehicle("speed", "gauge", 8, 0, 4, 4));

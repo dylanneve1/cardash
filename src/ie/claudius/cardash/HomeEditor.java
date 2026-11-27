@@ -3,6 +3,7 @@ package ie.claudius.cardash;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -81,6 +82,9 @@ final class HomeEditor implements GridPage.Edit {
         bar.addView(text(">", false, new Runnable() {
             @Override public void run() { act.goToPage(act.pageIndex() + 1); label(); }
         }));
+        bar.addView(text(act.getString(R.string.edit_style), false, new Runnable() {
+            @Override public void run() { stylePicker(); }
+        }));
         bar.addView(text(act.getString(R.string.edit_page_add), false, new Runnable() {
             @Override public void run() { addPage(); }
         }));
@@ -94,7 +98,11 @@ final class HomeEditor implements GridPage.Edit {
             @Override public void run() { act.exitEdit(true); }
         }));
         label();
-        return bar;
+        // A narrow screen scrolls the toolbar instead of cutting "Done" off.
+        HorizontalScrollView scroll = new HorizontalScrollView(act);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.addView(bar);
+        return scroll;
     }
 
     void label() {
@@ -271,6 +279,31 @@ final class HomeEditor implements GridPage.Edit {
     }
 
     // ---- pages -------------------------------------------------------------------------
+
+    /** How this page looks: its widgets, or the classic cluster screen. */
+    private void stylePicker() {
+        final HomeLayout.Page p = page();
+        String current = p.classic(Prefs.carTheme(act)) ? HomeLayout.CLASSIC : HomeLayout.MODERN;
+        final Pop pop = new Pop(act, m3, act.getString(R.string.edit_style_title));
+        pop.row(mark(act.getString(R.string.s_car_theme_modern), HomeLayout.MODERN.equals(current)),
+                style(p, HomeLayout.MODERN));
+        pop.row(mark(act.getString(R.string.s_car_theme_classic), HomeLayout.CLASSIC.equals(current)),
+                style(p, HomeLayout.CLASSIC));
+        pop.button(act.getString(android.R.string.cancel), null, false).show();
+    }
+
+    private static String mark(String s, boolean selected) {
+        return selected ? s + "  ✓" : s;
+    }
+
+    private Runnable style(final HomeLayout.Page p, final String theme) {
+        return new Runnable() {
+            @Override public void run() {
+                p.theme = theme;
+                act.rebuildEditing();
+            }
+        };
+    }
 
     private void addPage() {
         if (working.pages.size() >= HomeLayout.MAX_PAGES) {

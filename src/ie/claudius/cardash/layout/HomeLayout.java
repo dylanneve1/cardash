@@ -55,12 +55,34 @@ public final class HomeLayout {
         }
     }
 
+    /** Car page looks: the widgets as laid out, the classic cluster screen, or whatever Settings says. */
+    public static final String MODERN = "modern", CLASSIC = "classic", AUTO = "auto";
+
     public static final class Page {
         public final List<Item> items = new ArrayList<>();
+        /** {@link #MODERN}, {@link #CLASSIC}, {@link #AUTO} (a car page), or null for an ordinary page. */
+        public String theme;
+
+        /** @param carSetting the Settings choice for car pages */
+        public boolean classic(String carSetting) {
+            return CLASSIC.equals(AUTO.equals(theme) ? carSetting : theme);
+        }
+
+        /** A page the "car page style" setting applies to. */
+        public boolean isCarPage() {
+            if (theme != null) return true;
+            boolean car = false;
+            for (Item i : items) {
+                if (Kind.APP.equals(i.type)) return false;
+                car |= Kind.DOORS.equals(i.type);
+            }
+            return car;
+        }
 
         public Page copy() {
             Page p = new Page();
             for (Item i : items) p.items.add(i.copy());
+            p.theme = theme;
             return p;
         }
     }
@@ -157,6 +179,7 @@ public final class HomeLayout {
                 il.add(im);
             }
             pm.put("items", il);
+            if (p.theme != null) pm.put("theme", p.theme);
             pl.add(pm);
         }
         root.put("pages", pl);
@@ -182,6 +205,8 @@ public final class HomeLayout {
         for (Object po : (List<Object>) pl) {
             if (!(po instanceof Map) || l.pages.size() >= MAX_PAGES) continue;
             Page page = new Page();
+            Object theme = ((Map<String, Object>) po).get("theme");
+            if (MODERN.equals(theme) || CLASSIC.equals(theme) || AUTO.equals(theme)) page.theme = (String) theme;
             Object il = ((Map<String, Object>) po).get("items");
             if (il instanceof List) {
                 for (Object io : (List<Object>) il) {

@@ -89,6 +89,13 @@ public final class Prefs {
         prefs(ctx).edit().putString(key, value).apply();
     }
 
+    /** The look of car pages that follow Settings. */
+    public static final String CAR_THEME = "car_theme";   // modern | classic
+
+    public static String carTheme(Context ctx) {
+        return get(ctx, CAR_THEME, "modern");
+    }
+
     /** Remind to unplug the OBD dongle once the car is parked. */
     public static final String UNPLUG = "unplug";   // on | off
 
@@ -324,7 +331,7 @@ public final class Prefs {
     /** Everything that changes how the home screen is built, in one string. */
     public static String signature(Context ctx) {
         String[] keys = { SPEED, TEMP, CLOCK, SEED, SCRIM, MOTION, LAYOUT, HINT,
-                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE, SIDE, CAR_BODY };
+                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE, SIDE, CAR_BODY, CAR_THEME };
         StringBuilder sb = new StringBuilder();
         for (String k : keys) sb.append(get(ctx, k, "")).append('|');
         String layout = get(ctx, HOME_LAYOUT, "");

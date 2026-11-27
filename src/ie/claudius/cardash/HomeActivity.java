@@ -143,6 +143,12 @@ public class HomeActivity extends Activity implements Widgets.Host {
             }
 
             @Override
+            public void onHeading(float degrees) {
+                widgets.heading = degrees;
+                widgets.refresh(Widgets.HEADING);
+            }
+
+            @Override
             public void onPosition(double lat, double lon) {
                 weather.setLocation(lat, lon);
             }
@@ -332,6 +338,10 @@ public class HomeActivity extends Activity implements Widgets.Host {
         List<View> pages = new ArrayList<>();
         final boolean editing = editor != null;
         for (HomeLayout.Page p : layout.pages) {
+            if (p.classic(Prefs.carTheme(this))) {
+                pages.add(widgets.classicCluster(editing));
+                continue;
+            }
             GridPage gp = new GridPage(this, m3, layout, p, new GridPage.Factory() {
                 @Override
                 public View create(HomeLayout.Item it, int w, int h, int appIdx, boolean ed) {
