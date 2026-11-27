@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 
 import ie.claudius.cardash.Fonts;
+import ie.claudius.cardash.FaultCodes;
 import ie.claudius.cardash.M3;
 import ie.claudius.cardash.Motion;
 import ie.claudius.cardash.Prefs;
@@ -225,6 +226,7 @@ public class DiagnosticsActivity extends Activity {
         sourcesBody = panel(column, R.string.diag_sources, R.string.diag_sources_caption, null);
         obdBody = panel(column, R.string.diag_obd, R.string.diag_obd_caption, null);
         bluetoothButton((LinearLayout) obdBody.getParent());
+        codesButton((LinearLayout) obdBody.getParent());
 
         keysBody = panel(column, R.string.diag_keys, R.string.diag_keys_caption, keys);
         keys.body = keysBody;
@@ -468,10 +470,14 @@ public class DiagnosticsActivity extends Activity {
                 .append(" boot=").append(m.boot)
                 .append(" bonnet=").append(m.bonnet).append("\n        handbrake=").append(m.handbrake)
                 .append(" reverse=").append(m.reverse).append('\n');
+        if (m.readiness != null) {
+            sb.append("        monitors: ").append(m.readiness.headline()).append(", ")
+                    .append(m.readiness.light()).append('\n');
+        }
         for (VehicleField f : VehicleField.all()) {
-            Float engine = m.engine.get(f.pid);
+            Float engine = m.engine.get(f.key());
             if (engine != null) {
-                sb.append("        ").append(f.label).append(": ").append(f.format(engine))
+                sb.append("        ").append(f.label(m, false)).append(": ").append(f.format(engine))
                         .append(' ').append(f.unit).append('\n');
             }
         }
@@ -554,6 +560,21 @@ public class DiagnosticsActivity extends Activity {
         lp.topMargin = dp(12);
         lp.leftMargin = 0;
         card.addView(open, 1, lp);
+    }
+
+    /** Read the stored fault codes through whichever OBD source is running. Nothing is cleared. */
+    private void codesButton(LinearLayout card) {
+        TextView open = pill(getString(R.string.codes_read), true, new Runnable() {
+            @Override
+            public void run() {
+                FaultCodes.show(DiagnosticsActivity.this, m3);
+            }
+        });
+        open.setMinHeight(dp(56));
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) open.getLayoutParams();
+        lp.topMargin = dp(12);
+        lp.leftMargin = 0;
+        card.addView(open, 2, lp);
     }
 
     // ---- the simulated vehicle -------------------------------------------------------

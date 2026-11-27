@@ -30,6 +30,9 @@ public final class VehicleMerge {
             for (java.util.Map.Entry<Integer, Float> e : s.engine.entrySet()) {
                 if (!m.engine.containsKey(e.getKey())) m.engine.put(e.getKey(), e.getValue());
             }
+            if (m.readiness == null) m.readiness = s.readiness;
+            m.o2Sensors2Banks = first(m.o2Sensors2Banks, s.o2Sensors2Banks);
+            m.o2Sensors4Banks = first(m.o2Sensors4Banks, s.o2Sensors4Banks);
             m.doorFrontLeft = first(m.doorFrontLeft, s.doorFrontLeft);
             m.doorFrontRight = first(m.doorFrontRight, s.doorFrontRight);
             m.doorRearLeft = first(m.doorRearLeft, s.doorRearLeft);

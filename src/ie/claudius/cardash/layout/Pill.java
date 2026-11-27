@@ -94,6 +94,56 @@ public final class Pill {
         return new Cells(cols, rows, Math.min(n, rows * cols), (w - gap * (cols - 1)) / cols, rh, gap, stretch);
     }
 
+    /** A long list cut into headed sections, all in the same columns. */
+    public static final class Sections {
+        public final int cols;
+        public final float cellW, cellH;
+        /** The top of each section's heading; -1 for an empty section, which has none. */
+        public final float[] headY;
+        /** {x, y, w, h} of every pill, section after section. */
+        public final float[][] rects;
+        /** The height of it all. */
+        public final float height;
+
+        Sections(int cols, float cellW, float cellH, float[] headY, float[][] rects, float height) {
+            this.cols = cols; this.cellW = cellW; this.cellH = cellH;
+            this.headY = headY; this.rects = rects; this.height = height;
+        }
+    }
+
+    /**
+     * Stack sections of {@code counts[i]} pills in a width {@code w}: as
+     * many columns of about {@code idealColW} as fit, rows {@code rowH}
+     * tall, each section that has pills under a heading {@code headH} tall.
+     * It is as tall as it needs to be; the card scrolls it.
+     */
+    public static Sections sections(int[] counts, float w, float gap, float idealColW, float rowH, float headH) {
+        int cols = Math.max(1, (int) ((w + gap) / (idealColW + gap)));
+        float cellW = Math.max(0f, (w - gap * (cols - 1)) / cols);
+        int total = 0;
+        for (int n : counts) total += n;
+        float[] headY = new float[counts.length];
+        float[][] rects = new float[total][];
+        float y = 0;
+        int at = 0;
+        for (int s = 0; s < counts.length; s++) {
+            if (counts[s] <= 0) {
+                headY[s] = -1;
+                continue;
+            }
+            if (y > 0) y += gap;
+            headY[s] = y;
+            y += headH;
+            for (int i = 0; i < counts[s]; i++) {
+                int c = i % cols, r = i / cols;
+                rects[at++] = new float[] { c * (cellW + gap), y + r * (rowH + gap), cellW, rowH };
+            }
+            int rows = (counts[s] + cols - 1) / cols;
+            y += rows * rowH + (rows - 1) * gap;
+        }
+        return new Sections(cols, cellW, rowH, headY, rects, y);
+    }
+
     private static float rowHeight(int n, int cols, float h, float gap) {
         int rows = (n + cols - 1) / cols;
         return (h - gap * (rows - 1)) / rows;

@@ -93,6 +93,23 @@ public class PillTest {
             }
         }
 
+        // Headed sections: empty ones take no room, nothing overlaps, headings sit above their pills.
+        Pill.Sections sec = Pill.sections(new int[] { 4, 0, 7 }, 1200, 8, 300, 52, 30);
+        check(sec.cols == 3 && sec.rects.length == 11 && sec.headY[0] == 0 && sec.headY[1] == -1, "sections");
+        check(sec.rects[0][1] == 30 && sec.rects[3][1] == 90 && sec.headY[2] == 30 + 2 * 52 + 8 + 8, "stacked");
+        check(sec.rects[4][1] == sec.headY[2] + 30 && sec.height == sec.rects[10][1] + 52, "height");
+        for (int i = 0; i < sec.rects.length; i++) {
+            float[] a = sec.rects[i];
+            check(a[0] >= 0 && a[0] + a[2] <= 1200.5f && a[3] == 52, "section pill inside");
+            for (int j = 0; j < i; j++) {
+                float[] b = sec.rects[j];
+                check(a[0] >= b[0] + b[2] || b[0] >= a[0] + a[2] || a[1] >= b[1] + b[3] || b[1] >= a[1] + a[3],
+                        "section pills overlap");
+            }
+        }
+        check(Pill.sections(new int[] { 0, 0 }, 600, 8, 300, 52, 30).height == 0, "nothing to show");
+        check(Pill.sections(new int[] { 2 }, 100, 8, 300, 52, 30).cols == 1, "a narrow card has one column");
+
         if (failures > 0) {
             System.out.println(failures + " failures");
             System.exit(1);

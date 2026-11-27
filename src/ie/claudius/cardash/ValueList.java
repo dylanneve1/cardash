@@ -15,30 +15,24 @@ import ie.claudius.cardash.layout.Pill;
  * A card holding several pill bars, like the Pixel battery widget: rows
  * of pills, in as many columns as the width allows ({@link Pill#cells}).
  * Hidden pills take no room; with none to show it says what it is
- * waiting for.
+ * waiting for. (The long engine data list is {@link SectionList}.)
  */
 final class ValueList extends ViewGroup {
 
     private final float d;
-    private final boolean engine;
-    private final TextView title, empty;
+    private final TextView empty;
     private final List<ValueView> pills = new ArrayList<>();
 
-    /** @param engine the long list: a heading, narrower columns, shorter rows */
-    ValueList(Context ctx, M3 m3, boolean engine, String heading, String waiting) {
+    ValueList(Context ctx, M3 m3, String waiting) {
         super(ctx);
         d = ctx.getResources().getDisplayMetrics().density;
-        this.engine = engine;
         setBackground(Shapes.round(d, m3.surfaceContainer(), 32));
-        title = text(ctx, m3, heading, 16);
-        title.setGravity(Gravity.CENTER_VERTICAL);
         empty = text(ctx, m3, waiting, 18);
         empty.setGravity(Gravity.CENTER);
-        addView(title);
         addView(empty);
     }
 
-    private static TextView text(Context ctx, M3 m3, String s, int dpSize) {
+    static TextView text(Context ctx, M3 m3, String s, int dpSize) {
         TextView t = new TextView(ctx);
         t.setText(s);
         t.setTypeface(Fonts.display(ctx));
@@ -66,15 +60,9 @@ final class ValueList extends ViewGroup {
         return Math.round(Math.max(4 * d, Math.min(12 * d, Math.min(w, h) * 0.07f)));
     }
 
-    private int titleHeight(int h) {
-        return engine && h >= 200 * d ? Math.round(32 * d) : 0;
-    }
-
     private Pill.Cells cells(int n, int w, int h) {
         int p = pad(w, h);
-        return Pill.cells(n, w - 2 * p, h - 2 * p - titleHeight(h), 8 * d,
-                (engine ? 400 : 560) * d, 240 * d, 40 * d, (engine ? 56 : 64) * d, (engine ? 80 : 120) * d,
-                !engine);
+        return Pill.cells(n, w - 2 * p, h - 2 * p, 8 * d, 560 * d, 240 * d, 40 * d, 64 * d, 120 * d, true);
     }
 
     private List<ValueView> visible() {
@@ -88,8 +76,7 @@ final class ValueList extends ViewGroup {
         int w = MeasureSpec.getSize(wSpec), h = MeasureSpec.getSize(hSpec);
         setMeasuredDimension(w, h);
         int p = pad(w, h);
-        exactly(title, Math.max(0, w - 2 * p), titleHeight(h));
-        exactly(empty, Math.max(0, w - 2 * p), Math.max(0, h - 2 * p - titleHeight(h)));
+        exactly(empty, Math.max(0, w - 2 * p), Math.max(0, h - 2 * p));
         List<ValueView> on = visible();
         empty.setVisibility(on.isEmpty() ? View.VISIBLE : View.INVISIBLE);
         Pill.Cells c = cells(on.size(), w, h);
@@ -99,21 +86,20 @@ final class ValueList extends ViewGroup {
         }
     }
 
-    private static void exactly(View v, int w, int h) {
+    static void exactly(View v, int w, int h) {
         v.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
     }
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        int w = r - l, h = b - t, p = pad(w, h), th = titleHeight(h);
-        title.layout(p + Math.round(10 * d), p, w - p, p + th);
+        int w = r - l, h = b - t, p = pad(w, h);
         List<ValueView> on = visible();
-        empty.layout(p, p + th, w - p, h - p);
+        empty.layout(p, p, w - p, h - p);
         Pill.Cells c = cells(on.size(), w, h);
-        // The short list sits in the middle of its card; the long one starts under its heading.
+        // The list sits in the middle of its card.
         float used = c.rows * c.cellH + Math.max(0, c.rows - 1) * c.gap;
-        float top = p + th + (engine ? 0 : Math.max(0, (h - 2 * p - th - used) / 2f));
+        float top = p + Math.max(0, (h - 2 * p - used) / 2f);
         for (int i = 0; i < on.size(); i++) {
             View v = on.get(i);
             if (i >= c.shown) {

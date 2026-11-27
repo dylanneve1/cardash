@@ -9,7 +9,7 @@ import android.os.Looper;
  * switched on in Diagnostics, and then it runs alone, so pretend and real
  * data never mix. The dash is marked while it does.
  */
-public final class SimSource implements VehicleSource {
+public final class SimSource implements VehicleSource, DtcReader {
 
     private static final long TICK_MS = 200L;
 
@@ -26,6 +26,16 @@ public final class SimSource implements VehicleSource {
             main.postDelayed(this, TICK_MS);
         }
     };
+
+    @Override
+    public void readCodes(final DtcReader.Listener l) {
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                l.onCodes(SimVehicle.SHARED.codes(), null);
+            }
+        });
+    }
 
     @Override
     public boolean isAvailable(Context ctx) {

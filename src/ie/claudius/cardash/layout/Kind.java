@@ -130,7 +130,7 @@ public final class Kind {
     }
 
     public static String vehicleLabel(String field) {
-        return field(field).label;
+        return field(field).pickName();
     }
 
     /** Settings for a vehicle item showing {@code field}, with that field's usual range and warning. */

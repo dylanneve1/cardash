@@ -78,8 +78,9 @@ public final class Defaults {
     /**
      * The layout a fresh install gets: car information on the left, the
      * home page in the middle (where it starts), engine data on the
-     * right. With vehicle data switched off there is no car page, and the
-     * right page holds clock, now playing, weather and trip instead.
+     * right. With no vehicle source at all (car data off and no
+     * simulator) there is no car page, and the right page holds clock,
+     * now playing, weather and trip instead.
      */
     public static HomeLayout full(Options o, int cols, int rows) {
         HomeLayout l = home(o, cols, rows);
@@ -119,6 +120,47 @@ public final class Defaults {
 
     private static HomeLayout.Item list(String set, int x, int y, int w, int h) {
         return new HomeLayout.Item(Kind.LIST, x, y, w, h).set("set", set);
+    }
+
+    /** A car information page: its value list, a car theme, or vehicle widgets with no apps among them. */
+    public static boolean hasCarPage(HomeLayout l) {
+        for (HomeLayout.Page p : l.pages) {
+            if (p.isCarPage()) return true;
+            boolean vehicle = false, apps = false;
+            for (HomeLayout.Item i : p.items) {
+                if (Kind.LIST.equals(i.type) && Kind.LIST_CAR.equals(i.get("set", Kind.LIST_CAR))) return true;
+                vehicle |= Kind.VEHICLE.equals(i.type);
+                apps |= Kind.APP.equals(i.type);
+            }
+            if (vehicle && !apps) return true;
+        }
+        return false;
+    }
+
+    /** The engine data list, anywhere. */
+    public static boolean hasEnginePage(HomeLayout l) {
+        for (HomeLayout.Page p : l.pages) {
+            for (HomeLayout.Item i : p.items) {
+                if (Kind.LIST.equals(i.type) && Kind.LIST_ENGINE.equals(i.get("set", Kind.LIST_CAR))) return true;
+            }
+        }
+        return false;
+    }
+
+    /** True when a (saved) layout lacks the car page or the engine data page. */
+    public static boolean needsCarPages(HomeLayout l) {
+        return !hasCarPage(l) || !hasEnginePage(l);
+    }
+
+    /**
+     * Give a layout whichever of the two it lacks, the car page just left
+     * of the start page and the engine data just right of it. No other
+     * page or item changes; with no pages left to add, nothing happens.
+     */
+    public static void addCarPages(HomeLayout l, HomeLayout.Page car, HomeLayout.Page engine) {
+        boolean wantCar = !hasCarPage(l), wantEngine = !hasEnginePage(l);
+        if (wantEngine && l.pages.size() < HomeLayout.MAX_PAGES) l.insertPage(l.start + 1, engine);
+        if (wantCar && l.pages.size() < HomeLayout.MAX_PAGES) l.insertPage(l.start, car);
     }
 
     /** Clock and date, now playing, weather and the trip meter. */

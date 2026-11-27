@@ -260,6 +260,42 @@ public class HomeLayoutTest {
         check(!Kind.warning(200, 100, "never") && !Kind.warningHeld(true, 99, 100, "never", 0, 100), "never warns");
         check("coolant".equals(Kind.field("warp").id), "an unknown field falls back to coolant");
 
+        // ---- offering the car pages to a layout saved without them
+        HomeLayout fresh = Defaults.full(classic(), 12, 8);
+        check(Defaults.hasCarPage(fresh) && Defaults.hasEnginePage(fresh) && !Defaults.needsCarPages(fresh),
+                "the default has both");
+        HomeLayout bare = Defaults.home(classic(), 12, 8);
+        bare.pages.add(Defaults.infoPage(12, 8));
+        check(!Defaults.hasCarPage(bare) && !Defaults.hasEnginePage(bare) && Defaults.needsCarPages(bare),
+                "home and information have neither");
+        String homeWas = wrap(bare.pages.get(0), 12, 8).toJson(), infoWas = wrap(bare.pages.get(1), 12, 8).toJson();
+        Defaults.addCarPages(bare, Defaults.carPage(12, 8), Defaults.enginePage(12, 8));
+        check(bare.pages.size() == 4 && bare.start == 1 && !Defaults.needsCarPages(bare) && Arrange.valid(bare),
+                "both added");
+        check(wrap(bare.pages.get(1), 12, 8).toJson().equals(homeWas)
+                && wrap(bare.pages.get(3), 12, 8).toJson().equals(infoWas), "other pages untouched");
+        check("auto".equals(bare.pages.get(0).theme)
+                && Kind.LIST_ENGINE.equals(bare.pages.get(2).items.get(0).settings.get("set")),
+                "car left of home, engine data right of it");
+        Defaults.addCarPages(bare, Defaults.carPage(12, 8), Defaults.enginePage(12, 8));
+        check(bare.pages.size() == 4, "adding again changes nothing");
+        // The layout of the version before the engine data page: only that one is added.
+        HomeLayout older = Defaults.home(classic(), 12, 8);
+        older.insertPage(0, Defaults.carPage(12, 8));
+        older.pages.add(Defaults.infoPage(12, 8));
+        check(Defaults.needsCarPages(older), "no engine data page");
+        Defaults.addCarPages(older, Defaults.carPage(12, 8), Defaults.enginePage(12, 8));
+        check(older.pages.size() == 4 && older.start == 1 && Defaults.hasEnginePage(older)
+                && older.pages.get(2).items.size() == 1, "engine data becomes the right page");
+        // A single gauge beside the apps is not a car page.
+        HomeLayout gauge = Defaults.home(classic(), 12, 8);
+        gauge.pages.get(0).items.add(new HomeLayout.Item(Kind.VEHICLE, 0, 0, 2, 2));
+        check(!Defaults.hasCarPage(gauge), "a gauge on the home page");
+        HomeLayout full8 = new HomeLayout(12, 8);
+        for (int i = 0; i < HomeLayout.MAX_PAGES; i++) full8.pages.add(new HomeLayout.Page());
+        Defaults.addCarPages(full8, Defaults.carPage(12, 8), Defaults.enginePage(12, 8));
+        check(full8.pages.size() == HomeLayout.MAX_PAGES, "no room, nothing added");
+
         if (fails == 0) System.out.println("HomeLayoutTest: ok");
         else { System.out.println("HomeLayoutTest: " + fails + " failure(s)"); System.exit(1); }
     }

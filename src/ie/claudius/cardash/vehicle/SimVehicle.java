@@ -1,6 +1,9 @@
 package ie.claudius.cardash.vehicle;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,7 +29,12 @@ public final class SimVehicle {
             { "door_rl", "Rear left door" }, { "door_rr", "Rear right door" },
             { "boot", "Boot" }, { "bonnet", "Bonnet" },
             { "handbrake", "Handbrake" }, { "reverse", "Reverse" },
+            { "mil", "Check-engine light" },
     };
+    /** What a code read returns while the check-engine light is switched on. */
+    private static final String[] MIL_CODES = { "P0420", "P0301" };
+    /** Monitor status of a petrol car with every test it has run but the evaporative one. */
+    private static final int[] MONITORS = { 0x00, 0x07, 0xE5, 0x04 };
     /** Length of the drive cycle. */
     public static final long CYCLE_MS = 90_000L;
 
@@ -131,8 +139,18 @@ public final class SimVehicle {
         return null;
     }
 
+    /** The stored fault codes: none until the check-engine light is switched on. */
+    public synchronized List<String> codes() {
+        List<String> out = new ArrayList<>();
+        if (values.get("mil") == 1) Collections.addAll(out, MIL_CODES);
+        return out;
+    }
+
     private static boolean isEngine(String id) {
-        return "intake".equals(id) || VehicleField.of(id) != null && VehicleField.of(id).interval > 0;
+        if ("intake".equals(id)) return true;
+        VehicleField f = VehicleField.of(id);
+        // The monitor status goes with the check-engine light switch.
+        return f != null && f.interval > 0 && f.type != VehicleField.Type.STATUS;
     }
 
     private static Float parseEngine(String id, String v) {
@@ -142,7 +160,7 @@ public final class SimVehicle {
             VehicleField field = VehicleField.of(id);
             if (Float.isNaN(f)) return null;
             int top = field.type == VehicleField.Type.DURATION || field.type == VehicleField.Type.DISTANCE
-                    ? 65535 : field.max;
+                    || field.type == VehicleField.Type.MINUTES ? 65535 : field.max;
             return Math.max(field.min, Math.min(top, f));
         } catch (NumberFormatException e) {
             return null;
@@ -184,8 +202,34 @@ public final class SimVehicle {
         m.put("railpressure", on ? clamp(40f + 110f * load / 100f, 0, 250) : 0);
         m.put("cattemp", on ? clamp(300f + 4f * load + 0.8f * coolant, 0, 1000) : coolant);
         m.put("runtime", on ? 600f + t : 0);
-        m.put("mildist", 0f);
+        boolean mil = known(v.get("mil"), 0) == 1;
+        m.put("mildist", mil ? 42f : 0f);
         m.put("cleardist", 1840f);
+        m.put("miltime", mil ? 95f : 0f);
+        m.put("cleartime", 2710f + t / 60f);
+        // The slow tier. Exhaust and particulate filter temperatures are left out: a petrol car has none.
+        m.put("relthrottle", on ? clamp(throttle - 12f, 0, 100) : 0);
+        m.put("pedale", on ? clamp((throttle - 12f) / 2f + 8f, 0, 100) : 8);
+        m.put("pedalf", on ? clamp((throttle - 12f) / 2f + 4f, 0, 100) : 4);
+        m.put("railrel", on ? clamp(300f + 0.5f * load, 0, 5200) : 0);
+        m.put("stft2", on ? 1.8f * wobble : 0);
+        m.put("ltft2", -0.8f);
+        m.put("egr", on && speed > 0 ? clamp(0.25f * load, 0, 100) : 0);
+        m.put("egrerr", on && speed > 0 ? 1.6f * wobble : 0);
+        m.put("evappurge", on && coolant > 70 ? clamp(8f + 0.3f * load, 0, 100) : 0);
+        m.put("evappressure", on ? -120f + 40f * wobble : 0);
+        for (int i = 1; i <= 8; i++) {
+            // The first sensor of each bank switches rich and lean; those after the catalyst sit still.
+            boolean upstream = i == 1 || i == 5;
+            float phase = (float) Math.sin(t * 5.0 + i);
+            float lambda = on ? 1f + (upstream ? 0.02f * phase : 0.004f * phase) : 2f;
+            m.put("o2v" + i, !on ? 0.45f : upstream ? 0.45f + 0.38f * phase : 0.62f + 0.04f * phase);
+            m.put("o2t" + i, on && upstream ? 2.3f * wobble : 0);
+            m.put("wbr" + i, lambda);
+            m.put("wbv" + i, on ? 2.2f + 0.1f * phase : 0);
+            m.put("wcr" + i, lambda);
+            m.put("wci" + i, on ? 0.3f * phase : 0);
+        }
         return m;
     }
 
@@ -233,8 +277,14 @@ public final class SimVehicle {
         for (Map.Entry<String, Float> e : eng.entrySet()) {
             if (e.getValue().isNaN()) continue;
             if ("intake".equals(e.getKey())) s.intakeC = Math.round(e.getValue());
-            else s.engine.put(VehicleField.of(e.getKey()).pid, e.getValue());
+            else s.engine.put(VehicleField.of(e.getKey()).key(), e.getValue());
         }
+        boolean mil = v.get("mil") == 1;
+        if (v.get("mil") != VehicleState.UNKNOWN_INT) {
+            s.readiness = Readiness.parse(new int[] { mil ? 0x80 | MIL_CODES.length : MONITORS[0],
+                    MONITORS[1], MONITORS[2], MONITORS[3] });
+        }
+        s.o2Sensors2Banks = 0xFF;
         s.doorFrontLeft = tri(v.get("door_fl"));
         s.doorFrontRight = tri(v.get("door_fr"));
         s.doorRearLeft = tri(v.get("door_rl"));

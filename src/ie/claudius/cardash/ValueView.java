@@ -126,6 +126,23 @@ public final class ValueView extends android.view.View {
         invalidate();
     }
 
+    /**
+     * A value that is words, not a number (the emissions readiness).
+     *
+     * @param value only for the warning threshold
+     * @param tail  said after the words, where a unit would be
+     */
+    public void setStatus(float value, String text, String tail) {
+        if (known && value == this.value && text.equals(shown) && tail.equals(unit)) return;
+        known = true;
+        this.value = value;
+        shown = text;
+        unit = tail;
+        note = null;
+        update();
+        invalidate();
+    }
+
     /** A pill that only says something: no range, no fill (the trip). */
     public void setInfo(String value, String unit, String detail) {
         if (known && value.equals(shown) && unit.equals(this.unit) && same(detail, this.detail)) return;

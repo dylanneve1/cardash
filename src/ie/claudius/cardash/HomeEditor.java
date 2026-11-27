@@ -394,10 +394,15 @@ final class HomeEditor implements GridPage.Edit {
         }
         final Pop pop = new Pop(act, m3, act.getString(R.string.edit_add_title));
         addRows(pop, entries);
-        List<Entry> values = new ArrayList<>();
-        for (VehicleField f : VehicleField.all()) values.add(new Entry(f.label, Kind.VEHICLE, f.id));
         pop.note(act.getString(R.string.edit_add_values));
-        addRows(pop, values);
+        for (VehicleField.Section section : VehicleField.Section.values()) {
+            List<Entry> values = new ArrayList<>();
+            for (VehicleField f : VehicleField.all()) {
+                if (f.section == section) values.add(new Entry(f.pickName(), Kind.VEHICLE, f.id));
+            }
+            pop.note(section.title);
+            addRows(pop, values);
+        }
         pop.button(act.getString(android.R.string.cancel), null, false);
         pop.show();
     }

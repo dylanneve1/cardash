@@ -115,7 +115,11 @@ public class ObdReplyTest {
         check(m.size() == 4 && eq(m.get(0x04), 0x7F) && eq(m.get(0x10), 0x01, 0x2C)
                 && eq(m.get(0x42), 0x35, 0xE8) && eq(m.get(0x5C), 0x82), "engine PIDs in one reply " + m.keySet());
         for (VehicleField f : VehicleField.all()) check(ObdReply.length(f.pid) == f.bytes, "length of " + f.id);
-        check(ObdReply.length(0x01) == -1, "an unknown PID has no length");
+        check(ObdReply.length(0x01) == 4 && ObdReply.length(0x13) == 1 && ObdReply.length(0x78) == 9
+                && ObdReply.length(0x02) == -1, "lengths; an unknown PID has none");
+        // A slow-tier PID at the end of a long reply: exhaust temperatures are nine bytes.
+        m = ObdReply.mode01("011\r0:410C1AF80D3278\r1:0110000000000000\r2:00AAAAAAAAAAAA\r", 0x0C, 0x0D, 0x78);
+        check(m.size() == 3 && m.get(0x78).length == 9 && m.get(0x78)[1] == 0x10, "a nine-byte PID " + m.keySet());
 
         // Engine data is only asked when the bitmaps list it.
         sch = new ObdSchedule(null, true);
@@ -123,7 +127,7 @@ public class ObdReplyTest {
             for (int[] q : sch.next(t)) check(!has(q, 0x04) && !has(q, 0x42), "no engine data without bitmaps");
         }
         Set<Integer> most = new TreeSet<>();
-        for (VehicleField f : VehicleField.all()) most.add(f.pid);
+        for (VehicleField f : VehicleField.all()) if (!f.slow) most.add(f.pid);   // the slow tier has its own test below
         // On CAN: six per request, core values first, and everything comes round.
         sch = new ObdSchedule(most, true);
         r = sch.next(0);
@@ -152,6 +156,43 @@ public class ObdReplyTest {
                 && new ObdSchedule(most, true).staleFor(0x04) == 10_000
                 && new ObdSchedule(most, true).staleFor(0x0C) == 3000, "how long values are kept");
 
+        // The slow tier: one at most in a request, every other cycle, and last in it.
+        Set<Integer> all = new TreeSet<>();
+        for (VehicleField.Request q : VehicleField.requests()) all.add(q.pid);
+        sch = new ObdSchedule(all, true);
+        int with = 0, cycles = 0;
+        for (long t = 0; t < 60_000; t += 100, cycles++) {
+            int[] q = sch.next(t).get(0);
+            check(q.length <= 6 && q[0] == 0x0C && q[1] == 0x0D, "fast first");
+            for (int i = 0; i < q.length; i++) {
+                if (!VehicleField.request(q[i]).slow) continue;
+                check(i == q.length - 1, "slow last " + Arrays.toString(q));
+                with++;
+            }
+        }
+        check(with <= cycles / 2 + 1 && with > cycles / 4, "slow tier share " + with + "/" + cycles);
+        coverage(new ObdSchedule(all, true), all, 100, 20_000L, "CAN, everything");
+        // One PID per request: the slow tier gets a third of the engine data's turns.
+        sch = new ObdSchedule(all, false);
+        int slowTurns = 0, engineTurns = 0;
+        for (long t = 0; t < 600_000; t += 500) {
+            r = sch.next(t);
+            check(r.size() <= 3, "still one besides the fast two");
+            if (r.size() < 3) continue;
+            VehicleField.Request q = VehicleField.request(r.get(2)[0]);
+            if (q.slow) slowTurns++;
+            else if (q.pid != 0x05 && q.pid != 0x2F && q.pid != 0x46) engineTurns++;
+        }
+        check(slowTurns > 0 && Math.abs(engineTurns - 2 * slowTurns) < engineTurns / 5,
+                "slow turns " + slowTurns + " of " + engineTurns);
+        check(sch.staleFor(0x14) > 90_000 && new ObdSchedule(all, true).staleFor(0x01) == 90_000
+                && new ObdSchedule(all, true).staleFor(0x08) == 30_000, "slow values are kept for a round");
+        // Slow PIDs are only asked where the bitmaps list them.
+        sch = new ObdSchedule(new TreeSet<>(Arrays.asList(0x0C, 0x0D, 0x01)), false);
+        for (long t = 0; t < 120_000; t += 500) {
+            for (int[] q : sch.next(t)) for (int p : q) check(p == 0x0C || p == 0x0D || p == 0x01, "asked " + p);
+        }
+
         RateMeter rm = new RateMeter();
         for (int i = 0; i <= 50; i++) rm.record(i * 100);
         check(Math.abs(rm.perSecond(5000) - 10f) < 0.5f, "10/s, got " + rm.perSecond(5000));
@@ -175,10 +216,11 @@ public class ObdReplyTest {
                 for (int p : q) {
                     Long was = last.put(p, t);
                     if (was == null) continue;
-                    VehicleField f = VehicleField.byPid(p);
-                    check(t - was <= sch.staleFor(p), what + ": " + f.id + " stale after " + (t - was));
+                    VehicleField.Request f = VehicleField.request(p);
+                    String id = ObdReply.hex2(p);
+                    check(t - was <= sch.staleFor(p), what + ": " + id + " stale after " + (t - was));
                     check(f.interval >= 15_000 || t - was <= Math.max(longest, f.interval * 2L),
-                            what + ": " + f.id + " waited " + (t - was));
+                            what + ": " + id + " waited " + (t - was));
                 }
             }
         }

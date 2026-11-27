@@ -248,6 +248,19 @@
     <string name="classic_edit_note">Classic VW style. Choose Style → Modern to edit this page\'s widgets.</string>
 
     <string name="sim_badge">SIMULATED VEHICLE</string>
+    <string name="codes_read">Read fault codes</string>
+    <string name="codes_reading">Reading fault codes…</string>
+    <string name="codes_title">Stored fault codes</string>
+    <string name="codes_none">No stored fault codes.</string>
+    <string name="codes_failed">Could not read the codes: %1$s</string>
+    <string name="codes_footer">Descriptions are generic. CarDash only reads codes and never clears them.</string>
+    <string name="readiness_title">Emissions readiness</string>
+    <string name="monitor_complete">complete</string>
+    <string name="monitor_incomplete">incomplete</string>
+    <string name="check_engine">Check engine</string>
+    <string name="car_pages_offer">Add car pages?</string>
+    <string name="car_pages_add">Add</string>
+    <string name="car_pages_no">Not now</string>
     <string name="diag_sim">Simulated vehicle</string>
     <string name="diag_sim_caption">Try the dash without a car. Control it from the Phone settings page, or: content call --uri content://ie.claudius.cardash.diag --method sim --arg \"rpm=3000,door_fl=1\"</string>
     <string name="diag_sim_start">Start simulator</string>

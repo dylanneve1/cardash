@@ -21,6 +21,7 @@ import ie.claudius.cardash.dash.SpeedSource;
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.dash.Weather;
 import ie.claudius.cardash.diag.DiagnosticsActivity;
+import ie.claudius.cardash.layout.Defaults;
 import ie.claudius.cardash.layout.HomeLayout;
 import ie.claudius.cardash.layout.Kind;
 import ie.claudius.cardash.media.NowPlaying;
@@ -254,8 +255,8 @@ public class HomeActivity extends Activity implements Widgets.Host {
     /** The vehicle sources only run while something on the home screen shows them. */
     private void syncVehicle() {
         boolean want = Prefs.showVehicle(this) && layout != null
-                && (layout.hasItem(Kind.VEHICLE) || layout.hasItem(Kind.DOORS) || layout.hasItem(Kind.CHIPS)
-                || anyClassicPage());
+                && (layout.hasItem(Kind.VEHICLE) || layout.hasItem(Kind.LIST) || layout.hasItem(Kind.DOORS)
+                || layout.hasItem(Kind.CHIPS) || anyClassicPage());
         String key = Prefs.sourceMode(this) + '|' + Prefs.obdAddress(this);
         if (vehicleKey != null && !key.startsWith(vehicleKey.substring(0, vehicleKey.indexOf('|') + 1))) {
             // Another kind of source: what the old one said no longer holds.
@@ -438,7 +439,29 @@ public class HomeActivity extends Activity implements Widgets.Host {
 
     // ---- banners ----------------------------------------------------------------
 
-    private View unplugBanner, simBadge;
+    private View unplugBanner, simBadge, offerBanner;
+
+    /**
+     * The simulator is on but the saved layout lacks the car or the engine
+     * data page (it was saved before they existed, say): offer them, once.
+     */
+    private boolean offerCarPages() {
+        return editor == null && layout != null && Prefs.simulating(this) && LayoutStore.isCustom(this)
+                && Prefs.get(this, Prefs.CAR_PAGES_OFFER, null) == null && Defaults.needsCarPages(layout);
+    }
+
+    private void answerOffer(boolean add) {
+        Prefs.set(this, Prefs.CAR_PAGES_OFFER, add ? "added" : "declined");
+        if (add) {
+            HomeLayout l = LayoutStore.load(this);
+            HomeLayout.Page showing = l.pages.get(Math.max(0, Math.min(pageIndex, l.pages.size() - 1)));
+            Defaults.addCarPages(l, LayoutStore.carPage(this), LayoutStore.enginePage(this));
+            LayoutStore.save(this, l);
+            pageIndex = l.pages.indexOf(showing);   // new pages went in around it
+        }
+        rebuildIfChanged();
+        showBanners();
+    }
 
     /** Notices that sit over whichever page is showing. */
     private void showBanners() {
@@ -450,6 +473,21 @@ public class HomeActivity extends Activity implements Widgets.Host {
         if (simBadge != null) {
             shell.removeView(simBadge);
             simBadge = null;
+        }
+        if (offerBanner != null) {
+            shell.removeView(offerBanner);
+            offerBanner = null;
+        }
+        if (offerCarPages()) {
+            offerBanner = Banners.carPages(this, m3, new Runnable() {
+                @Override public void run() { answerOffer(true); }
+            }, new Runnable() {
+                @Override public void run() { answerOffer(false); }
+            });
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+            lp.bottomMargin = Math.round(24 * density);
+            shell.addView(offerBanner, lp);
         }
         if (Prefs.simulating(this)) {
             simBadge = Banners.simulated(this);
@@ -514,10 +552,12 @@ public class HomeActivity extends Activity implements Widgets.Host {
 
     void exitEdit(boolean save) {
         if (editor == null) return;
-        if (save) {
+        // "Done" with nothing changed saves nothing, so a default layout keeps following the settings.
+        if (save && editor.dirty()) {
             HomeLayout w = editor.working;
             LayoutStore.check(w);
-            LayoutStore.save(this, w);
+            if (w.toJson().equals(LayoutStore.defaults(this).toJson())) LayoutStore.reset(this);
+            else LayoutStore.save(this, w);
         }
         editor = null;
         rebuild(false, true);

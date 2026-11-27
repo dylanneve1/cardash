@@ -28,8 +28,14 @@ public final class VehicleState {
     public int intakeC = UNKNOWN_INT;
     public int odometerKm = UNKNOWN_INT;
 
-    /** The other engine readings, mode-01 PID to metric value ({@link VehicleField}); absent is unknown. */
+    /** The other engine readings, {@link VehicleField#key} to metric value; absent is unknown. */
     public final java.util.Map<Integer, Float> engine = new java.util.TreeMap<>();
+
+    /** The check-engine light and self-tests, or null while unknown. */
+    public Readiness readiness;
+    /** The oxygen sensors fitted, as PID 13 (two banks) or 1D (four banks) says; UNKNOWN_INT if not read. */
+    public int o2Sensors2Banks = UNKNOWN_INT;
+    public int o2Sensors4Banks = UNKNOWN_INT;
 
     public Tri doorFrontLeft = Tri.UNKNOWN;
     public Tri doorFrontRight = Tri.UNKNOWN;
@@ -61,6 +67,9 @@ public final class VehicleState {
         c.intakeC = intakeC;
         c.odometerKm = odometerKm;
         c.engine.putAll(engine);
+        c.readiness = readiness;   // immutable
+        c.o2Sensors2Banks = o2Sensors2Banks;
+        c.o2Sensors4Banks = o2Sensors4Banks;
         c.doorFrontLeft = doorFrontLeft;
         c.doorFrontRight = doorFrontRight;
         c.doorRearLeft = doorRearLeft;
@@ -84,7 +93,13 @@ public final class VehicleState {
                 || outsideC != UNKNOWN_INT
                 || intakeC != UNKNOWN_INT
                 || !engine.isEmpty()
+                || readiness != null
                 || anyDoorKnown();
+    }
+
+    /** True where the car numbers its O2 sensors as pairs on up to four banks (PID 1D, not 13). */
+    public boolean o2FourBanks() {
+        return o2Sensors4Banks != UNKNOWN_INT && o2Sensors2Banks == UNKNOWN_INT;
     }
 
     public boolean anyDoorKnown() {
