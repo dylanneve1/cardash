@@ -82,6 +82,10 @@ public class BluetoothActivity extends Activity {
     private boolean searched;
     /** Last thing that happened (pairing, unpairing, a failure), shown above the lists. */
     private String message;
+    /** Device this screen started pairing, and which of PINS it is on (ELM327 clones use 1234 or 0000). */
+    private String pairingAddress;
+    private int pinIndex;
+    private static final String[] PINS = { "1234", "0000", "6789", "1111" };
     private String unpairing;
     private boolean touching, renderQueued;
 
@@ -142,6 +146,10 @@ public class BluetoothActivity extends Activity {
         f.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         f.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         f.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+        // Units whose vendor Bluetooth app shows no PIN dialog: answer legacy PIN requests for the
+        // device this screen is pairing, before the (missing) system dialog would.
+        f.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
+        f.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY - 1);
         Receivers.register(this, receiver, f, true);
 
         askPermissions();
@@ -382,6 +390,8 @@ public class BluetoothActivity extends Activity {
                                     BluetoothDevice.BOND_NONE),
                             intent.getIntExtra(EXTRA_REASON, 0));
                 }
+            } else if (BluetoothDevice.ACTION_PAIRING_REQUEST.equals(action)) {
+                if (answerPin(dev, intent) && isOrderedBroadcast()) abortBroadcast();
             } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
                 if (scan == Scan.CLASSIC) discoveryStarted = true;
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
@@ -403,7 +413,7 @@ public class BluetoothActivity extends Activity {
             BluetoothDevice dev = bt.getRemoteDevice(address);
             if (dev.getBondState() == BluetoothDevice.BOND_BONDING) {
                 message = getString(R.string.bt_pairing, label(d, address));
-            } else if (dev.createBond()) {
+            } else if (startBond(dev, true)) {
                 message = getString(R.string.bt_pairing, label(d, address));
             } else {
                 message = getString(R.string.bt_pair_not_started, label(d, address));
@@ -434,12 +444,48 @@ public class BluetoothActivity extends Activity {
             // Unpaired from here on purpose: stop pointing OBD at it.
             if (address.equalsIgnoreCase(Prefs.obdAddress(this))) Prefs.clearObdDongle(this);
             message = getString(R.string.bt_unpaired, label);
+        } else if (before == BluetoothDevice.BOND_BONDING && address.equalsIgnoreCase(pairingAddress)
+                && pinIndex + 1 < PINS.length && retryNextPin(dev)) {
+            message = getString(R.string.bt_pairing, label) + "  (PIN " + PINS[pinIndex] + ")";
         } else if (before == BluetoothDevice.BOND_BONDING) {
+            if (address.equalsIgnoreCase(pairingAddress)) pairingAddress = null;
             String why = BtDevices.bondFailure(reason);
             message = why == null ? getString(R.string.bt_pair_failed, label)
                     : getString(R.string.bt_pair_failed_why, label, why);
         }
         render();
+    }
+
+    private boolean startBond(BluetoothDevice dev, boolean fresh) {
+        if (fresh) pinIndex = 0;
+        pairingAddress = dev.getAddress();
+        return dev.createBond();
+    }
+
+    private boolean retryNextPin(BluetoothDevice dev) {
+        pinIndex++;
+        try {
+            return startBond(dev, false);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "createBond retry: " + e);
+            return false;
+        }
+    }
+
+    /** Legacy PIN pairing (classic ELM327): set the PIN ourselves; numeric comparison stays with the system. */
+    private boolean answerPin(BluetoothDevice dev, Intent intent) {
+        if (dev == null || pairingAddress == null || !pairingAddress.equalsIgnoreCase(dev.getAddress())) return false;
+        int variant = intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, -1);
+        if (variant != BluetoothDevice.PAIRING_VARIANT_PIN && variant != 5 /* PAIRING_VARIANT_PIN_16_DIGITS */) return false;
+        try {
+            if (dev.setPin(PINS[pinIndex].getBytes("US-ASCII"))) {
+                Log.i(TAG, "PIN " + PINS[pinIndex] + " sent to " + dev.getAddress());
+                return true;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "setPin: " + e);
+        }
+        return false;
     }
 
     private void confirmUnpair(final String address, final String label) {
