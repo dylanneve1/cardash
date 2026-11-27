@@ -67,6 +67,8 @@ public final class HomeLayout {
 
     public int cols, rows;
     public final List<Page> pages = new ArrayList<>();
+    /** The page the home screen opens on. */
+    public int start;
 
     public HomeLayout(int cols, int rows) {
         this.cols = Math.max(1, cols);
@@ -76,12 +78,28 @@ public final class HomeLayout {
     public HomeLayout copy() {
         HomeLayout l = new HomeLayout(cols, rows);
         for (Page p : pages) l.pages.add(p.copy());
+        l.start = start;
         return l;
     }
 
     public boolean hasItem(String type) {
         for (Page p : pages) for (Item i : p.items) if (i.type.equals(type)) return true;
         return false;
+    }
+
+    // ---- pages ------------------------------------------------------------------
+
+    /** Insert a page, keeping the start page the same page. */
+    public void insertPage(int at, Page p) {
+        if (at <= start && !pages.isEmpty()) start++;
+        pages.add(at, p);
+    }
+
+    /** Remove a page; removing the start page leaves its neighbour as the start. */
+    public void removePage(int at) {
+        pages.remove(at);
+        if (at < start) start--;
+        start = Math.max(0, Math.min(start, pages.size() - 1));
     }
 
     // ---- mirror ---------------------------------------------------------------
@@ -123,6 +141,7 @@ public final class HomeLayout {
         root.put("v", (double) VERSION);
         root.put("cols", (double) cols);
         root.put("rows", (double) rows);
+        root.put("start", (double) start);
         List<Object> pl = new ArrayList<>();
         for (Page p : pages) {
             Map<String, Object> pm = new LinkedHashMap<>();
@@ -184,6 +203,7 @@ public final class HomeLayout {
             l.pages.add(page);
         }
         if (l.pages.isEmpty()) l.pages.add(new Page());
+        l.start = Math.max(0, Math.min(num(root.get("start"), 0), l.pages.size() - 1));
         Arrange.repair(l);
         return l;
     }

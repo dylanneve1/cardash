@@ -38,6 +38,7 @@ import ie.claudius.cardash.Fonts;
 import ie.claudius.cardash.M3;
 import ie.claudius.cardash.Motion;
 import ie.claudius.cardash.Prefs;
+import ie.claudius.cardash.UnplugMonitor;
 import ie.claudius.cardash.R;
 import ie.claudius.cardash.Receivers;
 import ie.claudius.cardash.Shapes;
@@ -158,6 +159,7 @@ public class BluetoothActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        UnplugMonitor.shared().hold();   // home resumes it
         render();
     }
 

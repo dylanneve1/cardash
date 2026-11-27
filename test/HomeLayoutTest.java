@@ -78,7 +78,11 @@ public class HomeLayoutTest {
                     check(Arrange.valid(x) && x.cols == c && x.rows == rw, "default valid on " + c + "x" + rw);
                     check(x.pages.get(0).items.size() >= 3, "default not gutted on " + c + "x" + rw);
                 }
-                check(Arrange.valid(wrap(Defaults.vehiclePage(c, rw), c, rw)), "vehicle page valid on " + c + "x" + rw);
+                check(Arrange.valid(wrap(Defaults.carPage(c, rw), c, rw)), "car page valid on " + c + "x" + rw);
+                check(Defaults.carPage(c, rw).items.size() == 6, "car page complete on " + c + "x" + rw);
+                HomeLayout full = Defaults.full(classic(), c, rw);
+                check(Arrange.valid(full) && full.pages.size() == 3 && full.start == 1
+                        && Defaults.infoPage(c, rw).items.size() == 5, "full default on " + c + "x" + rw);
             }
         }
 
@@ -87,11 +91,32 @@ public class HomeLayoutTest {
         check(rt != null && rt.toJson().equals(d.toJson()), "json round trip");
         check(rt.cols == 12 && rt.rows == 8 && rt.pages.get(0).items.size() == d.pages.get(0).items.size(), "round trip shape");
         HomeLayout vp = new HomeLayout(12, 8);
-        vp.pages.add(Defaults.vehiclePage(12, 8));
+        vp.pages.add(Defaults.carPage(12, 8));
         HomeLayout vrt = HomeLayout.fromJson(vp.toJson());
         check(vrt != null && vrt.toJson().equals(vp.toJson()), "vehicle page round trip");
-        check("120".equals(vrt.pages.get(0).items.get(0).settings.get("max"))
-                && "110".equals(vrt.pages.get(0).items.get(0).settings.get("warn")), "coolant 0-120 warn 110");
+        check("5500".equals(vrt.pages.get(0).items.get(0).settings.get("warn")), "rpm gauge warns at 5500");
+        check("120".equals(vrt.pages.get(0).items.get(3).settings.get("max"))
+                && "110".equals(vrt.pages.get(0).items.get(3).settings.get("warn")), "coolant 0-120 warn 110");
+
+        // ---- default pages: car | home | information
+        HomeLayout three = Defaults.full(classic(), 12, 8);
+        check(count(wrap(three.pages.get(0), 12, 8), Kind.DOORS) == 1
+                && count(wrap(three.pages.get(0), 12, 8), Kind.VEHICLE) == 5, "left page is the car");
+        check(wrap(three.pages.get(1), 12, 8).toJson().equals(d.toJson()), "centre page is the old home");
+        check(count(wrap(three.pages.get(2), 12, 8), Kind.TRIP) == 1, "right page has the trip");
+        HomeLayout noCar = Defaults.full(minimal, 12, 8);
+        check(noCar.pages.size() == 2 && noCar.start == 0, "no car page with vehicle data off");
+        check(HomeLayout.fromJson(three.toJson()).start == 1 && three.copy().start == 1, "start page persists");
+        check(HomeLayout.fromJson(d.toJson().replace("\"start\":0", "\"start\":9")).start == 0, "start clamped");
+        check(HomeLayout.fromJson("{\"cols\":12,\"rows\":8,\"pages\":[{},{}]}").start == 0,
+                "a layout saved before start pages opens on the first");
+        three.insertPage(0, new HomeLayout.Page());
+        check(three.start == 2, "inserting before keeps the start page");
+        three.removePage(0);
+        three.removePage(0);
+        check(three.start == 0 && three.pages.size() == 2, "removing before keeps the start page");
+        three.removePage(0);
+        check(three.start == 0, "removing the start page");
         check(HomeLayout.fromJson(null) == null && HomeLayout.fromJson("") == null
                 && HomeLayout.fromJson("{") == null && HomeLayout.fromJson("[1]") == null
                 && HomeLayout.fromJson("{\"cols\":0,\"rows\":4,\"pages\":[]}") == null

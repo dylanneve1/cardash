@@ -161,7 +161,7 @@
     <string name="edit_page_add">+ Page</string>
     <string name="edit_page_remove">Delete page</string>
     <string name="edit_page_empty">Empty page</string>
-    <string name="edit_page_vehicle">Vehicle page (gauges, doors, speed)</string>
+    <string name="edit_page_vehicle">Car page (gauges, car, temperature)</string>
     <string name="edit_page_remove_q">Delete this page and everything on it?</string>
     <string name="edit_page_clear_q">This is the only page. Clear everything on it?</string>
     <string name="edit_page_clear">Clear</string>

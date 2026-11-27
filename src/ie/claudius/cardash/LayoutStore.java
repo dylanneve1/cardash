@@ -11,7 +11,7 @@ import ie.claudius.cardash.layout.HomeLayout;
 /**
  * Loads and saves the home layout (JSON in the same SharedPreferences as
  * everything else). With nothing saved the layout is generated from the
- * old Settings options, so an unedited install looks exactly as before.
+ * Settings options ({@link Defaults#full}); a saved one is left alone.
  */
 public final class LayoutStore {
 
@@ -49,7 +49,7 @@ public final class LayoutStore {
         o.date = Prefs.datePattern(ctx) != null;
         o.vehicle = Prefs.showVehicle(ctx);
         o.tiles = Apps.TILES;
-        HomeLayout l = Defaults.home(o, g[0], g[1]);
+        HomeLayout l = Defaults.full(o, g[0], g[1]);
         if (Prefs.rightHandDrive(ctx)) l.mirror();
         return l;
     }
@@ -79,10 +79,10 @@ public final class LayoutStore {
         Prefs.set(ctx, Prefs.SIDE, rhd ? "rhd" : "lhd");
     }
 
-    /** A fresh vehicle page sized for this screen. */
-    public static HomeLayout.Page vehiclePage(Context ctx) {
+    /** A fresh car page sized for this screen. */
+    public static HomeLayout.Page carPage(Context ctx) {
         int[] g = gridFor(ctx);
-        HomeLayout.Page p = Defaults.vehiclePage(g[0], g[1]);
+        HomeLayout.Page p = Defaults.carPage(g[0], g[1]);
         if (Prefs.rightHandDrive(ctx)) {
             HomeLayout t = new HomeLayout(g[0], g[1]);
             t.pages.add(p);

@@ -21,7 +21,7 @@ import ie.claudius.cardash.vehicle.VehicleState;
  * engine stopping is noticed even with another app in front, and raises
  * a notification; the home screen shows the same as a banner.
  */
-final class UnplugMonitor {
+public final class UnplugMonitor {
 
     private static final int NOTE_ID = 7;
     private static final String CHANNEL = "unplug";
@@ -29,7 +29,7 @@ final class UnplugMonitor {
 
     private static UnplugMonitor shared;
 
-    static synchronized UnplugMonitor shared() {
+    public static synchronized UnplugMonitor shared() {
         if (shared == null) shared = new UnplugMonitor();
         return shared;
     }
@@ -72,14 +72,23 @@ final class UnplugMonitor {
             VehicleHub.shared().start(app, listener, Prefs.sourceMode(app));
             main.removeCallbacks(tick);
             main.postDelayed(tick, TICK_MS);
-        } else if (attached) {
-            attached = false;
-            main.removeCallbacks(tick);
-            VehicleHub.shared().stop(listener);
+        } else {
+            hold();
             reminder = new UnplugReminder();
             cancel();
             changed();
         }
+    }
+
+    /**
+     * Let go of the sources for a while (the Bluetooth screen: every dongle
+     * connect attempt would cancel its device search). {@link #sync} resumes.
+     */
+    public void hold() {
+        if (!attached) return;
+        attached = false;
+        main.removeCallbacks(tick);
+        VehicleHub.shared().stop(listener);
     }
 
     void setListener(Runnable r) {

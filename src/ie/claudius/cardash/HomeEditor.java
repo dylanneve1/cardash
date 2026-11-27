@@ -282,7 +282,7 @@ final class HomeEditor implements GridPage.Edit {
                     @Override public void run() { insertPage(new HomeLayout.Page()); }
                 })
                 .row(act.getString(R.string.edit_page_vehicle), new Runnable() {
-                    @Override public void run() { insertPage(LayoutStore.vehiclePage(act)); }
+                    @Override public void run() { insertPage(LayoutStore.carPage(act)); }
                 })
                 .button(act.getString(android.R.string.cancel), null, false)
                 .show();
@@ -290,7 +290,7 @@ final class HomeEditor implements GridPage.Edit {
 
     private void insertPage(HomeLayout.Page p) {
         int at = Math.min(act.pageIndex() + 1, working.pages.size());
-        working.pages.add(at, p);
+        working.insertPage(at, p);
         act.setPageIndex(at);
         act.rebuildEditing();
     }
@@ -311,7 +311,7 @@ final class HomeEditor implements GridPage.Edit {
                 new Runnable() {
                     @Override public void run() {
                         int at = act.pageIndex();
-                        working.pages.remove(at);
+                        working.removePage(at);
                         act.setPageIndex(Math.max(0, at - 1));
                         act.rebuildEditing();
                     }
@@ -327,7 +327,8 @@ final class HomeEditor implements GridPage.Edit {
                         working.pages.addAll(fresh.pages);
                         working.cols = fresh.cols;
                         working.rows = fresh.rows;
-                        act.setPageIndex(0);
+                        working.start = fresh.start;
+                        act.setPageIndex(fresh.start);
                         act.rebuildEditing();
                     }
                 });

@@ -58,7 +58,8 @@ public class HomeActivity extends Activity implements Widgets.Host {
 
     private HomeLayout layout;
     private HomeEditor editor;
-    private int pageIndex;
+    /** The page showing; -1 until the first build picks the layout's start page. */
+    private int pageIndex = -1;
     private String editBaseSig;
 
     private final VehicleHub vehicle = VehicleHub.shared();
@@ -110,6 +111,10 @@ public class HomeActivity extends Activity implements Widgets.Host {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        // Home pressed while already on the home screen: back to the start page.
+        if (intent != null && intent.hasCategory(Intent.CATEGORY_HOME) && editor == null && hasWindowFocus()) {
+            goToPage(layout.start);
+        }
         if (intent != null && intent.getBooleanExtra(EXTRA_EDIT, false)) {
             intent.removeExtra(EXTRA_EDIT);
             enterEdit();
@@ -316,6 +321,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
             // Same working copy, new colours.
             editor = new HomeEditor(this, m3, editor.working, editor.originalJson());
         }
+        if (pageIndex < 0) pageIndex = layout.start;
         pageIndex = Math.max(0, Math.min(pageIndex, layout.pages.size() - 1));
 
         FrameLayout page = new FrameLayout(this);
