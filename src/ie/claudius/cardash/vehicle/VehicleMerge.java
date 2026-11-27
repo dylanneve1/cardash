@@ -24,6 +24,9 @@ public final class VehicleMerge {
             m.speedKph = first(m.speedKph, s.speedKph);
             m.rpm = first(m.rpm, s.rpm);
             m.coolantC = first(m.coolantC, s.coolantC);
+            m.outsideC = first(m.outsideC, s.outsideC);
+            m.intakeC = first(m.intakeC, s.intakeC);
+            m.odometerKm = first(m.odometerKm, s.odometerKm);
             m.doorFrontLeft = first(m.doorFrontLeft, s.doorFrontLeft);
             m.doorFrontRight = first(m.doorFrontRight, s.doorFrontRight);
             m.doorRearLeft = first(m.doorRearLeft, s.doorRearLeft);

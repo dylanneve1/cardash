@@ -52,6 +52,10 @@ import ie.claudius.cardash.car.Vin;
  *   0D  vehicle speed       A km/h
  *   05  coolant temp        A-40 °C
  *   2F  fuel level          A*100/255 %   (optional; many cars lack it)
+ *   46  outside air temp    A-40 °C       (optional)
+ *   0F  intake air temp     A-40 °C       (only when 46 is missing)
+ *
+ * Engine OBD has no inside temperature.
  */
 public final class ObdSource implements VehicleSource {
 
@@ -383,6 +387,8 @@ public final class ObdSource implements VehicleSource {
             case ObdSchedule.SPEED: state.speedKph = b[0]; break;
             case ObdSchedule.COOLANT: state.coolantC = b[0] - 40; break;
             case ObdSchedule.FUEL: state.fuelPercent = (int) Math.round(b[0] * 100.0 / 255.0); break;
+            case ObdSchedule.AMBIENT: state.outsideC = b[0] - 40; break;
+            case ObdSchedule.INTAKE: state.intakeC = b[0] - 40; break;
             default: break;
         }
     }
@@ -405,6 +411,8 @@ public final class ObdSource implements VehicleSource {
             case ObdSchedule.SPEED: state.speedKph = VehicleState.UNKNOWN_INT; break;
             case ObdSchedule.COOLANT: state.coolantC = VehicleState.UNKNOWN_INT; break;
             case ObdSchedule.FUEL: state.fuelPercent = VehicleState.UNKNOWN_INT; break;
+            case ObdSchedule.AMBIENT: state.outsideC = VehicleState.UNKNOWN_INT; break;
+            case ObdSchedule.INTAKE: state.intakeC = VehicleState.UNKNOWN_INT; break;
             default: break;
         }
     }

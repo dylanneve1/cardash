@@ -456,6 +456,9 @@ public class DiagnosticsActivity extends Activity {
         VehicleState m = hub.merged();
         sb.append("\nmerged: fuel=").append(v(m.fuelPercent)).append("  speed=").append(v(m.speedKph))
                 .append("  rpm=").append(v(m.rpm)).append("  coolant=").append(v(m.coolantC))
+                .append("\n        outside=").append(v(m.outsideC)).append("  intake=").append(v(m.intakeC))
+                .append("  odometer=").append(v(m.odometerKm))
+                .append("\n        inside temperature: not available over engine OBD")
                 .append("\n        doors FL=").append(m.doorFrontLeft).append(" FR=").append(m.doorFrontRight)
                 .append(" RL=").append(m.doorRearLeft).append(" RR=").append(m.doorRearRight)
                 .append(" boot=").append(m.boot).append("\n        handbrake=").append(m.handbrake)

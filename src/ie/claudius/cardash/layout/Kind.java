@@ -48,7 +48,7 @@ public final class Kind {
         this.options = Collections.unmodifiableList(l);
     }
 
-    private static final String[] VFIELDS = { "coolant", "fuel", "rpm", "speed" };
+    private static final String[] VFIELDS = { "coolant", "fuel", "rpm", "speed", "outside" };
 
     private static final List<Kind> ALL;
     static {
@@ -106,11 +106,13 @@ public final class Kind {
         if ("fuel".equals(field)) return new int[] { 0, 100, 15 };
         if ("rpm".equals(field)) return new int[] { 0, 8000, 6500 };
         if ("speed".equals(field)) return new int[] { 0, 220, 130 };
+        if ("outside".equals(field)) return new int[] { -20, 50, 3 };
         return new int[] { 0, 120, 110 }; // coolant
     }
 
     public static String vehicleWarnDir(String field) {
-        return "fuel".equals(field) ? "below" : "above";
+        // Outside air warns when it is cold enough for ice.
+        return "fuel".equals(field) || "outside".equals(field) ? "below" : "above";
     }
 
     public static String vehicleUnit(String field) {
@@ -124,6 +126,7 @@ public final class Kind {
         if ("fuel".equals(field)) return "Fuel";
         if ("rpm".equals(field)) return "RPM";
         if ("speed".equals(field)) return "Speed";
+        if ("outside".equals(field)) return "Outside";
         return "Coolant";
     }
 

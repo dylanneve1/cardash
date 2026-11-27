@@ -1,8 +1,10 @@
 package ie.claudius.cardash.vehicle;
 
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.Binder;
 import android.os.Handler;
@@ -19,6 +21,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+
+import ie.claudius.cardash.Receivers;
 
 /**
  * Car data on HCN head units (packages com.hcn.*), whose canbox app is
@@ -68,6 +72,9 @@ public final class HcnSource implements VehicleSource {
             "persist.vendor.cem.cardoor5", // boot
     };
     static final String SETTING_GEAR = "key_can_gear";
+    /** autocan's outdoor temperature broadcast (not filled by the VW Raise decoders in v42). */
+    static final String ACTION_OUTDOOR = "hcn.air.outdoor_temp";
+    static final String EXTRA_OUTDOOR = "hcn.air.extra.outdoor_temp";
 
     private static final long POLL_MS = 1000L;
     private static final long REBIND_MS = 5000L;
@@ -177,6 +184,18 @@ public final class HcnSource implements VehicleSource {
         }
     };
 
+    private int broadcastTempC = HcnParse.UNKNOWN;
+
+    private final BroadcastReceiver outdoor = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context c, Intent i) {
+            String v = i.getStringExtra(EXTRA_OUTDOOR);
+            broadcastTempC = HcnParse.outdoorTempC(v);
+            note("outdoor temp broadcast \"" + v + '"');
+            publish();
+        }
+    };
+
     private final Runnable rebind = new Runnable() {
         @Override
         public void run() {
@@ -217,6 +236,8 @@ public final class HcnSource implements VehicleSource {
         ctx = c.getApplicationContext();
         listener = l;
         running = true;
+        // Exported: the broadcast comes from the vendor's own package.
+        Receivers.register(ctx, outdoor, new IntentFilter(ACTION_OUTDOOR), true);
         bind();
         main.post(poll);
     }
@@ -225,6 +246,7 @@ public final class HcnSource implements VehicleSource {
     public void stop() {
         if (!running) return;
         running = false;
+        Receivers.unregister(ctx, outdoor);
         main.removeCallbacks(poll);
         main.removeCallbacks(rebind);
         if (service != null && registered) transact(TX_UNREGISTER);
@@ -384,6 +406,10 @@ public final class HcnSource implements VehicleSource {
         // 10 s old number would beat a live one. Diagnostics still shows it.
         int fuel = HcnParse.fuelPercent(body.fuelLitres, HcnParse.TANK_LITRES_POLO_6R);
         if (fuel != HcnParse.UNKNOWN) state.fuelPercent = fuel;
+        if (body.outsideDeciC != HcnParse.UNKNOWN) state.outsideC = Math.round(body.outsideDeciC / 10f);
+        else if (broadcastTempC != HcnParse.UNKNOWN) state.outsideC = broadcastTempC;
+        else state.outsideC = VehicleState.UNKNOWN_INT;
+        if (body.odometerKm != HcnParse.UNKNOWN) state.odometerKm = body.odometerKm;
         lastUpdate = System.currentTimeMillis();
         VehicleState.Listener l = listener;
         if (l != null) l.onVehicleState(state);

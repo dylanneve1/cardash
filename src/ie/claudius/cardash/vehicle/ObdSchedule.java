@@ -15,13 +15,14 @@ import java.util.Set;
  */
 public final class ObdSchedule {
 
-    public static final int RPM = 0x0C, SPEED = 0x0D, COOLANT = 0x05, FUEL = 0x2F;
+    public static final int RPM = 0x0C, SPEED = 0x0D, COOLANT = 0x05, FUEL = 0x2F,
+            AMBIENT = 0x46, INTAKE = 0x0F;
     public static final int MAX_PER_REQUEST = 6;
 
     private static final int[] FAST = { RPM, SPEED };
     /** {pid, interval ms} */
     private static final int[][] SLOW = {
-            { COOLANT, 2000 }, { FUEL, 10000 },
+            { COOLANT, 2000 }, { FUEL, 10000 }, { AMBIENT, 15000 }, { INTAKE, 15000 },
     };
 
     private final Set<Integer> supported;   // null: not known, ask and see
@@ -39,6 +40,8 @@ public final class ObdSchedule {
     public void singleOnly() { multi = false; }
 
     public boolean wants(int pid) {
+        // Intake air only stands in for outside air: not asked when the car has the real thing.
+        if (pid == INTAKE && supported != null && supported.contains(AMBIENT)) return false;
         return supported == null || supported.contains(pid);
     }
 

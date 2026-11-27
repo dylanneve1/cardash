@@ -66,6 +66,14 @@ public final class ValueView extends android.view.View {
         setValue(known, value, null);
     }
 
+    /** Relabel (the outside temperature card becomes "Intake air" while that stands in for it). */
+    public void setLabel(String label) {
+        if (!label.equals(this.label)) {
+            this.label = label;
+            invalidate();
+        }
+    }
+
     public void setValue(boolean known, float value, String note) {
         if (known == this.known && value == this.value
                 && (note == null ? this.note == null : note.equals(this.note))) return;

@@ -32,6 +32,14 @@ public class HcnParseTest {
         eq("real handbrake bit", b.handbrake, 0);
         eq("real rpm untouched", b.rpm, U);
 
+        eq("outdoor 12.5℃", HcnParse.outdoorTempC("12.5℃"), 13);
+        eq("outdoor -3°C", HcnParse.outdoorTempC(" -3 °C "), -3);
+        eq("outdoor F", HcnParse.outdoorTempC("50℉"), 10);
+        eq("outdoor bare", HcnParse.outdoorTempC("7"), 7);
+        eq("outdoor dashes", HcnParse.outdoorTempC("--"), U);
+        eq("outdoor junk", HcnParse.outdoorTempC("999"), U);
+        eq("outdoor null", HcnParse.outdoorTempC(null), U);
+
         // Real: head unit -> box request for 0x41 sub 0x02. Valid frame, not data.
         byte[] req = bytes(0x2E, 0x90, 0x02, 0x41, 0x02, 0x2A);
         fs = HcnParse.frames(req);

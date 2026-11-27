@@ -202,6 +202,21 @@ public final class HcnParse {
         }
     }
 
+    /**
+     * HCN's outdoor temperature broadcast ("12.5℃", "-3°C", "--") as whole
+     * degrees C, or UNKNOWN. A Fahrenheit reading is converted.
+     */
+    public static int outdoorTempC(String s) {
+        if (s == null) return UNKNOWN;
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^\\s*([+-]?\\d{1,3}(?:[.,]\\d+)?)\\s*(℃|°\\s*C|C|℉|°\\s*F|F)?\\s*$").matcher(s);
+        if (!m.matches()) return UNKNOWN;
+        float v = Float.parseFloat(m.group(1).replace(',', '.'));
+        String u = m.group(2);
+        if (u != null && (u.endsWith("F") || u.equals("℉"))) v = (v - 32f) * 5f / 9f;
+        return v < -50f || v > 77.5f ? UNKNOWN : Math.round(v);
+    }
+
     /** Litres to a 0-100 percentage of the tank, or UNKNOWN. */
     public static int fuelPercent(int litres, int tankLitres) {
         if (litres == UNKNOWN || litres < 0 || tankLitres <= 0) return UNKNOWN;

@@ -215,7 +215,7 @@ final class HomeEditor implements GridPage.Edit {
         for (Kind k : Kind.all()) {
             if (Kind.APP.equals(k.id)) continue;
             if (Kind.VEHICLE.equals(k.id)) {
-                for (String f : new String[] { "coolant", "fuel", "rpm", "speed" }) {
+                for (String f : new String[] { "coolant", "fuel", "rpm", "speed", "outside" }) {
                     entries.add(new Entry(Kind.vehicleLabel(f), k.id, f));
                 }
             } else {

@@ -34,7 +34,7 @@
     <string name="s_speed_kmh">km/h</string>
     <string name="s_speed_mph">mph</string>
     <string name="s_temp">Temperature</string>
-    <string name="s_temp_caption">Unit on the weather card</string>
+    <string name="s_temp_caption">Unit for weather and outside temperature</string>
     <string name="s_temp_c">°C</string>
     <string name="s_temp_f">°F</string>
     <string name="s_clock">Clock</string>
@@ -183,6 +183,8 @@
     <string name="s_side_rhd">Right</string>
 
     <string name="unavailable">Unavailable</string>
+    <string name="outside_label">Outside</string>
+    <string name="intake_label">Intake air</string>
     <string name="s_car_make">Make</string>
     <string name="s_car_model">Model</string>
     <string name="s_car_body">Body</string>

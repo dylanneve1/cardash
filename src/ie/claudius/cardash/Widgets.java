@@ -445,22 +445,43 @@ final class Widgets {
         v.configure(Kind.vehicleLabel(field), Kind.vehicleUnit(field), "gauge".equals(it.get("style", "bar")),
                 it.getInt("min", def[0]), it.getInt("max", def[1]), it.getInt("warn", def[2]),
                 it.get("warndir", Kind.vehicleWarnDir(field)));
+        final boolean outside = "outside".equals(field);
+        final boolean f = outside && Prefs.fahrenheit(ctx);
+        if (f) {
+            v.configure(Kind.vehicleLabel(field), "°F", "gauge".equals(it.get("style", "bar")),
+                    toF(it.getInt("min", def[0])), toF(it.getInt("max", def[1])), toF(it.getInt("warn", def[2])),
+                    it.get("warndir", Kind.vehicleWarnDir(field)));
+        }
         add(new Live(VEH) {
             @Override void refresh() {
                 VehicleState s = lastVehicle;
                 int val = VehicleState.UNKNOWN_INT;
+                String note = null;
                 if (s != null) {
-                    if ("fuel".equals(field)) val = s.fuelPercent;
-                    else if ("rpm".equals(field)) val = s.rpm;
+                    if ("fuel".equals(field)) {
+                        val = s.fuelPercent;
+                        if (s.fuelUnsupported) note = ctx.getString(R.string.unavailable);
+                    } else if ("rpm".equals(field)) val = s.rpm;
                     else if ("speed".equals(field)) val = s.speedKph;
+                    else if (outside) val = s.outsideC;
                     else val = s.coolantC;
                 }
-                boolean none = "fuel".equals(field) && s != null && s.fuelUnsupported;
-                v.setValue(val != VehicleState.UNKNOWN_INT, val,
-                        none ? ctx.getString(R.string.unavailable) : null);
+                if (outside) {
+                    // Intake air stands in only when nothing reports outside air, and says so.
+                    boolean intake = val == VehicleState.UNKNOWN_INT && s != null
+                            && s.intakeC != VehicleState.UNKNOWN_INT;
+                    if (intake) val = s.intakeC;
+                    v.setLabel(ctx.getString(intake ? R.string.intake_label : R.string.outside_label));
+                }
+                boolean known = val != VehicleState.UNKNOWN_INT;
+                v.setValue(known, known && f ? toF(val) : val, note);
             }
         }).refresh();
         return v;
+    }
+
+    private static int toF(int c) {
+        return Math.round(c * 9f / 5f + 32f);
     }
 
     private View doors() {
@@ -492,7 +513,8 @@ final class Widgets {
         scroll.addView(bar, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
         scroll.setFillViewport(true);
-        final TextView fuel = chip(bar), coolant = chip(bar), rpm = chip(bar), doors = chip(bar), sample = chip(bar);
+        final TextView fuel = chip(bar), coolant = chip(bar), rpm = chip(bar), outside = chip(bar), doors = chip(bar),
+                sample = chip(bar);
         add(new Live(VEH) {
             @Override void refresh() {
                 VehicleState s = lastVehicle;
@@ -505,16 +527,23 @@ final class Widgets {
                         m3.surfaceContainerHigh(), m3.onSurface());
                 show(rpm, s.rpm != VehicleState.UNKNOWN_INT && s.rpm > 0 ? s.rpm + " rpm" : null,
                         m3.surfaceContainerHigh(), m3.onSurface());
+                show(outside, s.outsideC != VehicleState.UNKNOWN_INT ? "Outside " + temperature(s.outsideC) : null,
+                        m3.surfaceContainerHigh(), m3.onSurface());
                 int open = s.openDoors();
                 show(doors, open > 0 ? (open == 1 ? "Door open" : open + " doors open") : null,
                         m3.primaryContainer(), m3.onPrimaryContainer());
                 boolean empty = fuel.getVisibility() != View.VISIBLE && coolant.getVisibility() != View.VISIBLE
-                        && rpm.getVisibility() != View.VISIBLE && doors.getVisibility() != View.VISIBLE;
+                        && rpm.getVisibility() != View.VISIBLE && outside.getVisibility() != View.VISIBLE
+                        && doors.getVisibility() != View.VISIBLE;
                 show(sample, editing && empty ? "Vehicle strip" : null,
                         m3.surfaceContainerHigh(), m3.onSurfaceVariant());
             }
         }).refresh();
         return scroll;
+    }
+
+    private String temperature(int c) {
+        return Prefs.fahrenheit(ctx) ? toF(c) + "°F" : c + "°C";
     }
 
     private TextView chip(LinearLayout bar) {

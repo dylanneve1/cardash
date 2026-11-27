@@ -22,6 +22,12 @@ public final class VehicleState {
     public int rpm = UNKNOWN_INT;
     public int coolantC = UNKNOWN_INT;
 
+    /** Outside (ambient) air temperature. */
+    public int outsideC = UNKNOWN_INT;
+    /** Engine intake air temperature: only ever shown labelled as such, where outside is unknown. */
+    public int intakeC = UNKNOWN_INT;
+    public int odometerKm = UNKNOWN_INT;
+
     public Tri doorFrontLeft = Tri.UNKNOWN;
     public Tri doorFrontRight = Tri.UNKNOWN;
     public Tri doorRearLeft = Tri.UNKNOWN;
@@ -45,6 +51,9 @@ public final class VehicleState {
         c.speedKph = speedKph;
         c.rpm = rpm;
         c.coolantC = coolantC;
+        c.outsideC = outsideC;
+        c.intakeC = intakeC;
+        c.odometerKm = odometerKm;
         c.doorFrontLeft = doorFrontLeft;
         c.doorFrontRight = doorFrontRight;
         c.doorRearLeft = doorRearLeft;
@@ -63,6 +72,8 @@ public final class VehicleState {
                 || speedKph != UNKNOWN_INT
                 || rpm != UNKNOWN_INT
                 || coolantC != UNKNOWN_INT
+                || outsideC != UNKNOWN_INT
+                || intakeC != UNKNOWN_INT
                 || anyDoorKnown();
     }
 
@@ -74,13 +85,16 @@ public final class VehicleState {
                 || boot != Tri.UNKNOWN;
     }
 
-    /** Fields with a value, out of the eleven — a health number for diagnostics. */
+    /** Fields with a value, out of {@link #FIELDS} — a health number for diagnostics. */
     public int knownCount() {
         int n = 0;
         if (fuelPercent != UNKNOWN_INT) n++;
         if (speedKph != UNKNOWN_INT) n++;
         if (rpm != UNKNOWN_INT) n++;
         if (coolantC != UNKNOWN_INT) n++;
+        if (outsideC != UNKNOWN_INT) n++;
+        if (intakeC != UNKNOWN_INT) n++;
+        if (odometerKm != UNKNOWN_INT) n++;
         for (Tri t : new Tri[] { doorFrontLeft, doorFrontRight, doorRearLeft,
                 doorRearRight, boot, handbrake, reverse }) {
             if (t != Tri.UNKNOWN) n++;
@@ -88,7 +102,7 @@ public final class VehicleState {
         return n;
     }
 
-    public static final int FIELDS = 11;
+    public static final int FIELDS = 14;
 
     /** How many doors are actually standing open right now. */
     public int openDoors() {

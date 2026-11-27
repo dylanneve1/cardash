@@ -98,6 +98,12 @@ public class ObdReplyTest {
         check(has(sch.next(10), 0x2F) || has(r, 0x2F), "the other slow one follows");
         check(new ObdSchedule(new TreeSet<Integer>(), true).next(0).isEmpty(), "nothing supported");
 
+        // Intake air is only asked when there is no ambient PID.
+        sch = new ObdSchedule(new TreeSet<>(Arrays.asList(0x46, 0x0F)), true);
+        check(has(sch.next(0), 0x46) && !sch.wants(0x0F), "ambient replaces intake");
+        sch = new ObdSchedule(new TreeSet<>(Arrays.asList(0x0F)), true);
+        check(has(sch.next(0), 0x0F), "intake as the fallback");
+
         RateMeter rm = new RateMeter();
         for (int i = 0; i <= 50; i++) rm.record(i * 100);
         check(Math.abs(rm.perSecond(5000) - 10f) < 0.5f, "10/s, got " + rm.perSecond(5000));
