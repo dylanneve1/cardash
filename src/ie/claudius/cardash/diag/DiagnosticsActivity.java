@@ -461,7 +461,8 @@ public class DiagnosticsActivity extends Activity {
                 .append("\n        inside temperature: not available over engine OBD")
                 .append("\n        doors FL=").append(m.doorFrontLeft).append(" FR=").append(m.doorFrontRight)
                 .append(" RL=").append(m.doorRearLeft).append(" RR=").append(m.doorRearRight)
-                .append(" boot=").append(m.boot).append("\n        handbrake=").append(m.handbrake)
+                .append(" boot=").append(m.boot)
+                .append(" bonnet=").append(m.bonnet).append("\n        handbrake=").append(m.handbrake)
                 .append(" reverse=").append(m.reverse).append('\n');
         return sb.toString();
     }

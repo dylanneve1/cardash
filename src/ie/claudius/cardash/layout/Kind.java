@@ -73,7 +73,7 @@ public final class Kind {
                 new Option("max", "Maximum", 120, -1000, 100000, 10),
                 new Option("warn", "Warning at", 110, -1000, 100000, 5),
                 new Option("warndir", "Warn when", "above", "above", "below")));
-        k.add(new Kind(DOORS, "Doors", 2, 2, 2, 3));
+        k.add(new Kind(DOORS, "Car (doors)", 2, 2, 3, 4));
         k.add(new Kind(ALLAPPS, "All apps button", 2, 1, 3, 1));
         k.add(new Kind(SETTINGS, "Settings button", 1, 1, 1, 1));
         k.add(new Kind(CHIPS, "Vehicle strip", 3, 1, 4, 1));

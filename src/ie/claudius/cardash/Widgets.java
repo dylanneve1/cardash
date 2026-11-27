@@ -111,7 +111,7 @@ final class Widgets {
             case Kind.TRIP: v = trip(w, h); break;
             case Kind.WEATHER: v = weather(w, h); break;
             case Kind.VEHICLE: v = vehicle(it); break;
-            case Kind.DOORS: v = doors(); break;
+            case Kind.DOORS: v = car(); break;
             case Kind.ALLAPPS: v = allApps(w, h); break;
             case Kind.SETTINGS: v = settingsButton(w, h); break;
             case Kind.CHIPS: v = chips(editing); break;
@@ -485,12 +485,14 @@ final class Widgets {
         return Math.round(c * 9f / 5f + 32f);
     }
 
-    private View doors() {
-        final DoorsView v = new DoorsView(ctx, M3.withAlpha(m3.onSurface(), 0x22), m3.primary(),
-                M3.withAlpha(m3.onSurfaceVariant(), 0x88), m3.onSurfaceVariant());
+    private View car() {
+        final CarView v = new CarView(ctx, m3.surfaceContainer());
         v.setBackground(Shapes.round(d, m3.surfaceContainer(), 28));
         add(new Live(VEH) {
-            @Override void refresh() { v.setState(lastVehicle); }
+            @Override void refresh() {
+                v.setThreeDoor(Prefs.carProfile(ctx).threeDoor());
+                v.setState(lastVehicle);
+            }
         }).refresh();
         return v;
     }

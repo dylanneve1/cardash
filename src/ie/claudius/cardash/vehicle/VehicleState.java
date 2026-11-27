@@ -33,6 +33,7 @@ public final class VehicleState {
     public Tri doorRearLeft = Tri.UNKNOWN;
     public Tri doorRearRight = Tri.UNKNOWN;
     public Tri boot = Tri.UNKNOWN;
+    public Tri bonnet = Tri.UNKNOWN;
     public Tri handbrake = Tri.UNKNOWN;
     public Tri reverse = Tri.UNKNOWN;
 
@@ -59,6 +60,7 @@ public final class VehicleState {
         c.doorRearLeft = doorRearLeft;
         c.doorRearRight = doorRearRight;
         c.boot = boot;
+        c.bonnet = bonnet;
         c.handbrake = handbrake;
         c.reverse = reverse;
         c.obdReplyMillis = obdReplyMillis;
@@ -82,7 +84,8 @@ public final class VehicleState {
                 || doorFrontRight != Tri.UNKNOWN
                 || doorRearLeft != Tri.UNKNOWN
                 || doorRearRight != Tri.UNKNOWN
-                || boot != Tri.UNKNOWN;
+                || boot != Tri.UNKNOWN
+                || bonnet != Tri.UNKNOWN;
     }
 
     /** Fields with a value, out of {@link #FIELDS} — a health number for diagnostics. */
@@ -96,13 +99,13 @@ public final class VehicleState {
         if (intakeC != UNKNOWN_INT) n++;
         if (odometerKm != UNKNOWN_INT) n++;
         for (Tri t : new Tri[] { doorFrontLeft, doorFrontRight, doorRearLeft,
-                doorRearRight, boot, handbrake, reverse }) {
+                doorRearRight, boot, bonnet, handbrake, reverse }) {
             if (t != Tri.UNKNOWN) n++;
         }
         return n;
     }
 
-    public static final int FIELDS = 14;
+    public static final int FIELDS = 15;
 
     /** How many doors are actually standing open right now. */
     public int openDoors() {
@@ -112,6 +115,7 @@ public final class VehicleState {
         if (doorRearLeft == Tri.YES) n++;
         if (doorRearRight == Tri.YES) n++;
         if (boot == Tri.YES) n++;
+        if (bonnet == Tri.YES) n++;
         return n;
     }
 

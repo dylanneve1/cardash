@@ -32,6 +32,7 @@ public final class VehicleMerge {
             m.doorRearLeft = first(m.doorRearLeft, s.doorRearLeft);
             m.doorRearRight = first(m.doorRearRight, s.doorRearRight);
             m.boot = first(m.boot, s.boot);
+            m.bonnet = first(m.bonnet, s.bonnet);
             m.handbrake = first(m.handbrake, s.handbrake);
             m.reverse = first(m.reverse, s.reverse);
             m.obdReplyMillis = Math.max(m.obdReplyMillis, s.obdReplyMillis);
