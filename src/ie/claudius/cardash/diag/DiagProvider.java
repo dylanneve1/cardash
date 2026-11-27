@@ -299,7 +299,8 @@ public final class DiagProvider extends ContentProvider {
             }
             if (obdDetail && e.source instanceof ObdSource) {
                 ObdSource.Diag d = ((ObdSource) e.source).diag();
-                sb.append("  paired: ").append(d.paired).append("\n  matched: ").append(d.matched)
+                sb.append("  paired: ").append(d.paired).append("\n  chosen: ").append(d.chosen)
+                        .append("\n  matched: ").append(d.matched)
                         .append("\n  socket: ").append(d.socket).append('\n');
                 for (Map.Entry<String, String> raw : d.raw.entrySet()) {
                     sb.append("  ").append(raw.getKey()).append(" -> ").append(raw.getValue()).append('\n');

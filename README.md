@@ -97,6 +97,10 @@ Built for a Jancar / Rockchip RK3326 unit — Android 11, 32-bit — and kept ho
 
 OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where both report a field, the CAN box wins. When OBD reports speed, the gauge prefers it over GPS (no lag under braking, no tunnel dropout). Fuel is remembered across restarts; doors are not.
 
+## Bluetooth and the OBD dongle
+
+*Settings → Bluetooth / OBD dongle* (or *Diagnostics → OBD-II*) pairs a dongle without leaving CarDash. **Scan** runs classic discovery, then a 10 s Bluetooth LE scan; likely dongles are marked and listed first. Tap one to pair (most ELM327s use PIN 1234 or 0000), then **Use as OBD dongle**: CarDash connects to that address whatever it is called. With none chosen it matches paired devices by name. Only classic (SPP) dongles can be read; BLE-only ones are labelled. Searching needs the location permission and location switched on.
+
 ## Phone settings
 
 *Settings → Phone settings → On* serves a small settings page on the local network (the head unit usually sits on the phone's hotspot). The row shows the address, a QR code of it and a 6-digit pairing code: scan it (or type the address) on the phone, enter the code once, and change the dash widgets, layout and units from there. LAN only, off by default, five wrong codes lock it until it is switched off and on.
@@ -148,7 +152,7 @@ Settings → Apps → Default apps → Home app. The stock launcher stays instal
 
 ```sh
 ./build.sh      # -> cardash.apk
-./test.sh       # plain-JVM tests: OBD parser, HCN/Raise frames, phone settings page, QR encoder
+./test.sh       # plain-JVM tests: OBD parser, HCN/Raise frames, phone settings page, QR encoder, Bluetooth device list
 ```
 
 Needs an Android SDK with build-tools 35.0.0+ and platform 34 (`ANDROID_SDK_ROOT` if it isn't in the default place). The script generates a debug keystore on first run; use your own for anything you hand to other people.

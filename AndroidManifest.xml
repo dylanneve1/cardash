@@ -23,9 +23,15 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Diagnostics: the wireless-Android-Auto capability checks. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- No maxSdkVersion on the first two: while we target 30 they are still what Android 12+
+         honours for the legacy half. BLUETOOTH_SCAN/CONNECT only exist on API 31+, where the
+         Bluetooth screen asks for them. -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <!-- Reading media metadata needs an enabled notification listener;
          MEDIA_CONTENT_CONTROL is signature-level and will simply not be
@@ -66,6 +72,11 @@
             android:exported="false" />
         <activity
             android:name=".SettingsActivity"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|uiMode"
+            android:exported="false" />
+        <activity
+            android:name=".bt.BluetoothActivity"
             android:screenOrientation="landscape"
             android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|uiMode"
             android:exported="false" />

@@ -16,8 +16,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import ie.claudius.cardash.Prefs;
+import ie.claudius.cardash.bt.BtDevices;
+
 /**
  * ELM327 over Bluetooth serial.
+ *
+ * The device is the one chosen on the Bluetooth screen, whatever it is
+ * called; with none chosen, the first paired device named like a dongle.
  *
  * Deliberately conservative: one polling thread, a short list of PIDs,
  * and any parse failure leaves the field UNKNOWN rather than guessing.
@@ -43,17 +49,20 @@ public final class ObdSource implements VehicleSource {
     private static final UUID SPP =
             UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final long POLL_MS = 1000L;
-    private static final String[] NAME_HINTS = { "OBD", "ELM", "VLINK", "VGATE", "KONNWEI" };
 
     /** Snapshot for the Diagnostics screen. */
     public static final class Diag {
         public final List<String> paired = new ArrayList<>();
+        /** The dongle chosen on the Bluetooth screen, or null when matching by name. */
+        public String chosen;
         public String matched;
         public String socket;
         public final Map<String, String> raw = new LinkedHashMap<>();
     }
 
     private volatile boolean running;
+    /** Application context, for the chosen-dongle setting. */
+    private volatile Context appCtx;
     private Thread worker;
     private BluetoothSocket socket;
     private String socketState = "not started";
@@ -70,17 +79,20 @@ public final class ObdSource implements VehicleSource {
 
     @Override
     public boolean isAvailable(Context ctx) {
+        appCtx = ctx.getApplicationContext();
         return findAdapter() != null;
     }
 
     @Override
     public String status(Context ctx) {
+        appCtx = ctx.getApplicationContext();
         BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
         if (bt == null) return "no Bluetooth adapter on this unit";
         try {
             if (!bt.isEnabled()) return "Bluetooth is off";
             if (findAdapter() == null) {
-                return "no paired device named like an ELM327 ("
+                if (chosenAddress() != null) return "chosen dongle " + chosenLabel() + " is not paired";
+                return "no chosen dongle, and no paired device named like an ELM327 ("
                         + bt.getBondedDevices().size() + " paired)";
             }
         } catch (SecurityException e) {
@@ -108,6 +120,7 @@ public final class ObdSource implements VehicleSource {
         } catch (SecurityException e) {
             d.paired.add("(Bluetooth permission refused)");
         }
+        d.chosen = chosenAddress() == null ? null : chosenLabel();
         d.socket = socketState;
         synchronized (raw) {
             d.raw.putAll(raw);
@@ -115,17 +128,28 @@ public final class ObdSource implements VehicleSource {
         return d;
     }
 
-    /** A paired device whose name looks like an ELM327 clone. */
+    private String chosenAddress() {
+        return appCtx == null ? null : Prefs.obdAddress(appCtx);
+    }
+
+    private String chosenLabel() {
+        return Prefs.obdName(appCtx) + "  " + chosenAddress();
+    }
+
+    /** The paired device to talk to: the chosen one, else one named like an ELM327 clone. */
     private BluetoothDevice findAdapter() {
         try {
             BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
             if (bt == null || !bt.isEnabled()) return null;
-            for (BluetoothDevice d : bt.getBondedDevices()) {
-                String n = d.getName();
-                if (n == null) continue;
-                String u = n.toUpperCase();
-                for (String hint : NAME_HINTS) if (u.contains(hint)) return d;
+            List<BluetoothDevice> devices = new ArrayList<>(bt.getBondedDevices());
+            List<String> addresses = new ArrayList<>();
+            List<String> names = new ArrayList<>();
+            for (BluetoothDevice d : devices) {
+                addresses.add(d.getAddress());
+                names.add(d.getName());
             }
+            int i = BtDevices.pickDongle(chosenAddress(), addresses, names);
+            return i < 0 ? null : devices.get(i);
         } catch (SecurityException e) {
             // Bluetooth permission refused; treat as simply unavailable.
             Log.w(TAG, "no bluetooth permission");
@@ -136,6 +160,7 @@ public final class ObdSource implements VehicleSource {
     @Override
     public void start(Context ctx, final VehicleState.Listener listener) {
         if (running) return;
+        appCtx = ctx.getApplicationContext();
         running = true;
         socketState = "connecting";
         worker = new Thread(new Runnable() {
@@ -194,6 +219,7 @@ public final class ObdSource implements VehicleSource {
         }
         try {
             socket = dev.createRfcommSocketToServiceRecord(SPP);
+            stopInquiry();
             socket.connect();
             OutputStream out = socket.getOutputStream();
             InputStream in = socket.getInputStream();
@@ -209,6 +235,15 @@ public final class ObdSource implements VehicleSource {
             socketState = "connect failed: " + e.getMessage();
             closeQuietly();
             return false;
+        }
+    }
+
+    /** A running inquiry makes RFCOMM connects slow or fail; being refused is not fatal. */
+    private void stopInquiry() {
+        try {
+            BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
+        } catch (SecurityException e) {
+            Log.w(TAG, "no permission to stop discovery");
         }
     }
 
