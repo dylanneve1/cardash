@@ -16,10 +16,8 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 import ie.claudius.cardash.dash.Speedo;
 import ie.claudius.cardash.dash.Trip;
@@ -426,11 +424,11 @@ final class Widgets {
                 boolean miles = Prefs.mph(ctx);
                 float m = tr.metres();
                 long ms = tr.movingMs();
-                Motion.swapText(dist, Trip.distance(m, miles) + (miles ? " mi" : " km"));
+                Motion.setText(dist, Trip.distance(m, miles) + (miles ? " mi" : " km"));
                 int avg = Trip.average(m, ms, miles);
                 String text = Trip.duration(ms);
                 if (avg >= 0) text += " · " + avg + (miles ? " mph " : " km/h ") + ctx.getString(R.string.trip_avg);
-                Motion.swapText(detail, text);
+                Motion.setText(detail, text);
             }
         }).refresh();
         return card;
@@ -477,73 +475,74 @@ final class Widgets {
      * Fuel / coolant / rpm / doors as pills. Nothing plugged in means
      * nothing to show — an empty strip of dashes looks broken, so the
      * strip stays empty until a source reports something.
+     *
+     * Every chip is made once, in a fixed order, and only its text and
+     * visibility change: live data arrives several times a second, so
+     * nothing here fades, moves or is rebuilt. The strip and the gauges
+     * redraw from the same state in the same pass, so they always agree.
      */
     private View chips(final boolean editing) {
         final HorizontalScrollView scroll = new HorizontalScrollView(ctx);
         scroll.setHorizontalScrollBarEnabled(false);
-        final LinearLayout bar = new LinearLayout(ctx);
+        LinearLayout bar = new LinearLayout(ctx);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        Motion.animateChildren(bar);
         scroll.addView(bar, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
         scroll.setFillViewport(true);
-        final Map<String, TextView> byKey = new HashMap<>();
+        final TextView fuel = chip(bar), coolant = chip(bar), rpm = chip(bar), doors = chip(bar), sample = chip(bar);
         add(new Live(VEH) {
             @Override void refresh() {
                 VehicleState s = lastVehicle;
                 if (s == null) s = new VehicleState();
                 boolean lowFuel = s.fuelPercent != VehicleState.UNKNOWN_INT && s.fuelPercent <= 15;
-                chip(bar, byKey, "fuel", s.fuelPercent != VehicleState.UNKNOWN_INT ? "Fuel " + s.fuelPercent + "%" : null,
+                show(fuel, s.fuelPercent != VehicleState.UNKNOWN_INT ? "Fuel " + s.fuelPercent + "%" : null,
                         lowFuel ? m3.tertiaryContainer() : m3.surfaceContainerHigh(),
                         lowFuel ? m3.onTertiaryContainer() : m3.onSurface());
-                chip(bar, byKey, "coolant", s.coolantC != VehicleState.UNKNOWN_INT ? s.coolantC + "°C" : null,
+                show(coolant, s.coolantC != VehicleState.UNKNOWN_INT ? s.coolantC + "°C" : null,
                         m3.surfaceContainerHigh(), m3.onSurface());
-                chip(bar, byKey, "rpm", s.rpm != VehicleState.UNKNOWN_INT && s.rpm > 0 ? s.rpm + " rpm" : null,
+                show(rpm, s.rpm != VehicleState.UNKNOWN_INT && s.rpm > 0 ? s.rpm + " rpm" : null,
                         m3.surfaceContainerHigh(), m3.onSurface());
                 int open = s.openDoors();
-                chip(bar, byKey, "doors", open > 0 ? (open == 1 ? "Door open" : open + " doors open") : null,
+                show(doors, open > 0 ? (open == 1 ? "Door open" : open + " doors open") : null,
                         m3.primaryContainer(), m3.onPrimaryContainer());
-                if (editing && byKey.isEmpty()) {
-                    chip(bar, byKey, "sample", "Vehicle strip", m3.surfaceContainerHigh(), m3.onSurfaceVariant());
-                } else if (!editing) {
-                    chip(bar, byKey, "sample", null, 0, 0);
-                }
+                boolean empty = fuel.getVisibility() != View.VISIBLE && coolant.getVisibility() != View.VISIBLE
+                        && rpm.getVisibility() != View.VISIBLE && doors.getVisibility() != View.VISIBLE;
+                show(sample, editing && empty ? "Vehicle strip" : null,
+                        m3.surfaceContainerHigh(), m3.onSurfaceVariant());
             }
         }).refresh();
         return scroll;
     }
 
-    /** Chips are keyed so a value that merely changed updates in place; only a chip that appears or goes animates. */
-    private void chip(LinearLayout bar, Map<String, TextView> byKey, String key, String text, int fill, int onFill) {
-        TextView t = byKey.get(key);
+    private TextView chip(LinearLayout bar) {
+        TextView t = new TextView(ctx);
+        t.setTypeface(Fonts.body(ctx));
+        t.setFontFeatureSettings("tnum");   // digits of one width, so a changing number doesn't jiggle
+        t.setTextSize(15);
+        t.setPadding(dp(14), dp(8), dp(14), dp(8));
+        t.setVisibility(View.GONE);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = dp(8);
+        bar.addView(t, lp);
+        return t;
+    }
+
+    private void show(TextView t, String text, int fill, int onFill) {
         if (text == null) {
-            if (t != null) { bar.removeView(t); byKey.remove(key); }
+            if (t.getVisibility() != View.GONE) t.setVisibility(View.GONE);
             return;
         }
-        if (t == null) {
-            t = new TextView(ctx);
-            t.setTypeface(Fonts.body(ctx));
-            t.setTextSize(15);
-            t.setPadding(dp(14), dp(8), dp(14), dp(8));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.rightMargin = dp(8);
-            t.setLayoutParams(lp);
-            t.setText(text);
-            byKey.put(key, t);
-            bar.addView(t);
-        } else {
-            Motion.swapText(t, text);
-        }
+        Motion.setText(t, text);
         // Restyle only on a role change (fuel turning low), so the ripple isn't rebuilt on every update.
         Integer styled = (Integer) t.getTag();
         if (styled == null || styled != fill) {
             t.setTextColor(onFill);
             t.setBackground(Shapes.pill(d, fill, M3.withAlpha(onFill, 0x33)));
             t.setTag(fill);
-            if (styled != null) Motion.pop(t);
         }
+        if (t.getVisibility() != View.VISIBLE) t.setVisibility(View.VISIBLE);
     }
 
     // ---- now playing --------------------------------------------------------------
