@@ -455,7 +455,9 @@ final class Widgets {
                     else if ("speed".equals(field)) val = s.speedKph;
                     else val = s.coolantC;
                 }
-                v.setValue(val != VehicleState.UNKNOWN_INT, val);
+                boolean none = "fuel".equals(field) && s != null && s.fuelUnsupported;
+                v.setValue(val != VehicleState.UNKNOWN_INT, val,
+                        none ? ctx.getString(R.string.unavailable) : null);
             }
         }).refresh();
         return v;

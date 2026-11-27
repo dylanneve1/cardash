@@ -33,6 +33,11 @@ public final class VehicleState {
     /** Wall-clock millis of the last valid OBD data reply, 0 for never. */
     public long obdReplyMillis;
 
+    /** The car's VIN, or null. */
+    public String vin;
+    /** The car says it has no fuel level on OBD and nothing else reports one: show "unavailable". */
+    public boolean fuelUnsupported;
+
     /** A snapshot that later writes to this one don't touch. */
     public VehicleState copy() {
         VehicleState c = new VehicleState();
@@ -48,6 +53,8 @@ public final class VehicleState {
         c.handbrake = handbrake;
         c.reverse = reverse;
         c.obdReplyMillis = obdReplyMillis;
+        c.vin = vin;
+        c.fuelUnsupported = fuelUnsupported;
         return c;
     }
 

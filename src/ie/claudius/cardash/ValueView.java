@@ -31,6 +31,8 @@ public final class ValueView extends android.view.View {
     private String warnDir = "above";
     private float value;
     private boolean known;
+    /** Shown under the dash when the car cannot give this value, e.g. "Unavailable". */
+    private String note;
     private int accent, warnColor = WARN;
 
     public ValueView(Context ctx, int trackColor, int accent, int text, int subtext) {
@@ -61,7 +63,13 @@ public final class ValueView extends android.view.View {
     }
 
     public void setValue(boolean known, float value) {
-        if (known == this.known && value == this.value) return;
+        setValue(known, value, null);
+    }
+
+    public void setValue(boolean known, float value, String note) {
+        if (known == this.known && value == this.value
+                && (note == null ? this.note == null : note.equals(this.note))) return;
+        this.note = note;
         this.known = known;
         this.value = value;
         invalidate();
@@ -101,7 +109,7 @@ public final class ValueView extends android.view.View {
             big.setTextSize(s * 0.30f);
             c.drawText(text, cx, cy + s * 0.10f, big);
             small.setTextSize(Math.max(11 * d, s * 0.09f));
-            c.drawText(known ? unit.trim() : "", cx, cy + s * 0.27f, small);
+            c.drawText(known ? unit.trim() : note != null ? note : "", cx, cy + s * 0.27f, small);
             small.setTextSize(Math.max(12 * d, Math.min(labelH, 16 * d)));
             c.drawText(label, cx, h - 8 * d, small);
         } else {
@@ -116,10 +124,10 @@ public final class ValueView extends android.view.View {
             big.setTextSize(valueSize);
             float baseY = h - p - barH - 6 * d;
             c.drawText(text, p, baseY, big);
-            if (known) {
+            if (known || note != null) {
                 float tw = big.measureText(text);
-                small.setTextSize(Math.max(12 * d, valueSize * 0.32f));
-                c.drawText(unit.trim(), p + tw + 6 * d, baseY, small);
+                small.setTextSize(Math.max(12 * d, valueSize * (known ? 0.32f : 0.28f)));
+                c.drawText(known ? unit.trim() : note, p + tw + 6 * d, baseY, small);
             }
             float top = h - p - barH;
             track.setStyle(Paint.Style.FILL);

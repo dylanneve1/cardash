@@ -116,6 +116,19 @@ public final class ObdReply {
         return out;
     }
 
+    /** The VIN from a mode-09 PID 02 reply (one CAN message, or five short ones), or null. */
+    public static String vin(String reply) {
+        StringBuilder sb = new StringBuilder();
+        for (int[] m : messages(reply)) {
+            if (m.length < 3 || m[0] != 0x49 || m[1] != 0x02) continue;
+            // m[2] counts the items (CAN) or numbers the message; padding bytes are zeros.
+            for (int i = 3; i < m.length; i++) {
+                if (Character.isLetterOrDigit(m[i]) && m[i] < 128) sb.append((char) m[i]);
+            }
+        }
+        return sb.length() < 17 ? null : sb.substring(sb.length() - 17);
+    }
+
     /** The protocol number from an ATDPN reply ("6", or "A6" when found automatically); -1 if unreadable. */
     public static int protocol(String reply) {
         if (reply == null) return -1;

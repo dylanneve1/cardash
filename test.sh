@@ -11,6 +11,10 @@ javac -d "$OUT" \
   "$HERE/src/ie/claudius/cardash/vehicle/ObdSchedule.java" \
   "$HERE/src/ie/claudius/cardash/vehicle/RateMeter.java" \
   "$HERE/test/ObdReplyTest.java" \
+  "$HERE/src/ie/claudius/cardash/vehicle/VehicleState.java" \
+  "$HERE/src/ie/claudius/cardash/vehicle/VehicleMerge.java" \
+  "$HERE"/src/ie/claudius/cardash/car/*.java \
+  "$HERE/test/CarProfileTest.java" \
   "$HERE/src/ie/claudius/cardash/remote/RemoteForm.java" \
   "$HERE/src/ie/claudius/cardash/remote/QrCode.java" \
   "$HERE/src/ie/claudius/cardash/diag/ActivityTargets.java" \
@@ -30,6 +34,7 @@ javac -d "$OUT" \
   "$HERE/test/ExportTextTest.java"
 java -cp "$OUT" ObdParseTest
 java -cp "$OUT" ObdReplyTest
+java -cp "$OUT" CarProfileTest
 java -cp "$OUT" HcnParseTest
 java -cp "$OUT" RemoteFormTest
 java -cp "$OUT" QrCodeTest

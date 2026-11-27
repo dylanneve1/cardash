@@ -9,6 +9,8 @@ import android.os.Build;
 import java.util.ArrayList;
 import java.util.List;
 
+import ie.claudius.cardash.car.CarProfile;
+
 /**
  * User settings. Same SharedPreferences file as the tile assignments and
  * the cached weather position, so one clear-data wipes everything.
@@ -50,6 +52,11 @@ public final class Prefs {
     /** The OBD dongle chosen on the Bluetooth screen; absent = match a paired device by name. */
     public static final String OBD_ADDRESS = "obd_address";
     public static final String OBD_NAME = "obd_name";
+    /** Car profile: the VIN last read over OBD, and the user's overrides ("" = from the VIN). */
+    public static final String CAR_VIN = "car_vin";
+    public static final String CAR_MAKE = "car_make";
+    public static final String CAR_MODEL = "car_model";
+    public static final String CAR_BODY = "car_body";   // auto | 3door | 5door | estate | saloon
 
     public static final String W_SPEEDO = "speedo", W_TRIP = "trip", W_WEATHER = "weather";
     public static final String[] DASH_ALL = { W_SPEEDO, W_TRIP, W_WEATHER };
@@ -101,6 +108,11 @@ public final class Prefs {
 
     public static void clearObdDongle(Context ctx) {
         prefs(ctx).edit().remove(OBD_ADDRESS).remove(OBD_NAME).apply();
+    }
+
+    public static CarProfile carProfile(Context ctx) {
+        return CarProfile.of(get(ctx, CAR_MAKE, ""), get(ctx, CAR_MODEL, ""),
+                get(ctx, CAR_BODY, CarProfile.AUTO), get(ctx, CAR_VIN, null));
     }
 
     // ---- typed readers ----------------------------------------------------
@@ -295,7 +307,7 @@ public final class Prefs {
     /** Everything that changes how the home screen is built, in one string. */
     public static String signature(Context ctx) {
         String[] keys = { SPEED, TEMP, CLOCK, SEED, SCRIM, MOTION, LAYOUT, HINT,
-                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE, SIDE };
+                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE, SIDE, CAR_BODY };
         StringBuilder sb = new StringBuilder();
         for (String k : keys) sb.append(get(ctx, k, "")).append('|');
         String layout = get(ctx, HOME_LAYOUT, "");

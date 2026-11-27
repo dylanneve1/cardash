@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import ie.claudius.cardash.Prefs;
 import ie.claudius.cardash.bt.BtDevices;
+import ie.claudius.cardash.car.Vin;
 
 /**
  * ELM327 over Bluetooth serial.
@@ -305,6 +306,7 @@ public final class ObdSource implements VehicleSource {
                 }
                 socketState = link;
                 afterDiscovery(out, in);
+                publish(listener);
             }
             boolean any = false;
             for (int[] req : schedule.next(System.currentTimeMillis())) {
@@ -363,6 +365,13 @@ public final class ObdSource implements VehicleSource {
         ask(out, in, "ATAT2", REPLY_MS);
         ask(out, in, "ATST19", REPLY_MS);
         schedule = new ObdSchedule(supported, ObdReply.isCan(protocol));
+        state.fuelUnsupported = !schedule.wants(ObdSchedule.FUEL);
+        String vin = ObdReply.vin(ask(out, in, "0902", 5000));
+        if (vin != null) {
+            state.vin = vin;
+            // Diagnostics exports get posted publicly: don't keep the serial number in the raw log.
+            record("0902", "VIN " + Vin.masked(vin));
+        }
     }
 
     // ---- values -----------------------------------------------------------

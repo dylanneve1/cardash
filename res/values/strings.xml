@@ -182,6 +182,21 @@
     <string name="s_side_lhd">Left</string>
     <string name="s_side_rhd">Right</string>
 
+    <string name="unavailable">Unavailable</string>
+    <string name="s_car_make">Make</string>
+    <string name="s_car_model">Model</string>
+    <string name="s_car_body">Body</string>
+    <string name="s_car_body_caption">Draws the car with the right doors; the VIN doesn\'t say how many there are</string>
+    <string name="s_car_choose">Change</string>
+    <string name="s_car_3door">3-door</string>
+    <string name="s_car_5door">5-door</string>
+    <string name="s_car_estate">Estate</string>
+    <string name="s_car_saloon">Saloon</string>
+    <string name="s_car_auto">Auto (from VIN)</string>
+    <string name="s_car_unknown">Not known yet. Read from the VIN once the OBD dongle connects.</string>
+    <string name="s_car_from_vin">From VIN: %1$s</string>
+    <string name="s_car_chosen">Chosen: %1$s</string>
+
     <string name="s_bt">Bluetooth / OBD dongle</string>
     <string name="s_bt_caption">Search, pair and choose the OBD-II dongle</string>
     <string name="bt_title">Bluetooth</string>

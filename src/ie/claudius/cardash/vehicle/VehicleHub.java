@@ -2,19 +2,20 @@ package ie.claudius.cardash.vehicle;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import ie.claudius.cardash.Prefs;
+
 /**
  * Runs whichever sources this car actually has and merges them.
  *
- * The two sources overlap on almost nothing — OBD brings engine data,
- * the canbox brings body data — so merging is mostly a union. Where
- * both can report a field (fuel), the canbox wins: it reads the
- * cluster's own value rather than an optional OBD PID that Toyota may
- * not implement.
+ * The hub keeps each source's latest state and folds them together in a
+ * fixed priority order ({@link VehicleMerge}): the OBD dongle first
+ * (live engine values, and fuel where the car has the PID), then the
+ * canbox sources, which are the only ones that know about doors and
+ * stand in for fuel when OBD lacks it.
  *
  * There is exactly one of these per process. An ELM327 serves one
  * RFCOMM socket, so two hubs — say the home screen's and the
@@ -29,7 +30,6 @@ import java.util.List;
  */
 public final class VehicleHub {
 
-    private static final String TAG = "CarDash/Vehicle";
     private static final long FUEL_MEMORY_MS = 24 * 60 * 60 * 1000L;
 
     public static final String MODE_AUTO = "auto", MODE_OBD = "obd",
@@ -51,6 +51,8 @@ public final class VehicleHub {
         public int knownFields;
         /** When this source last delivered anything; 0 for never. */
         public long lastUpdate;
+        /** This source's latest state. */
+        VehicleState latest;
 
         Entry(VehicleSource s) {
             source = s;
@@ -59,7 +61,10 @@ public final class VehicleHub {
 
     private final List<Entry> entries = new ArrayList<>(3);
     private final List<VehicleState.Listener> listeners = new ArrayList<>(2);
-    private final VehicleState merged = new VehicleState();
+    private VehicleState merged = new VehicleState();
+    /** Remembered values from last time: used only while no source knows better. */
+    private final VehicleState memory = new VehicleState();
+    private long rememberedAt;
     private Context appCtx;
     private String runningMode;
     private long lastUpdate;
@@ -95,7 +100,8 @@ public final class VehicleHub {
         entries.clear();
         restoreFuel();
 
-        VehicleSource[] all = { new HcnSource(), new JancarSource(), new ObdSource() };
+        // Listed in merge priority order.
+        VehicleSource[] all = { new ObdSource(), new HcnSource(), new JancarSource() };
         for (VehicleSource s : all) {
             final Entry e = new Entry(s);
             entries.add(e);
@@ -114,7 +120,8 @@ public final class VehicleHub {
                     public void onVehicleState(VehicleState state) {
                         e.knownFields = state.knownCount();
                         e.lastUpdate = System.currentTimeMillis();
-                        merge(state);
+                        e.latest = state.copy();
+                        merge();
                     }
                 });
             }
@@ -123,8 +130,12 @@ public final class VehicleHub {
 
     private void stopSources() {
         for (Entry e : entries) if (e.started) e.source.stop();
-        for (Entry e : entries) e.started = false;
+        for (Entry e : entries) {
+            e.started = false;
+            e.latest = null;
+        }
         runningMode = null;
+        merged = new VehicleState();
     }
 
     /** True when at least one source is plugged in and talking. */
@@ -145,29 +156,16 @@ public final class VehicleHub {
         return lastUpdate;
     }
 
-    private void merge(VehicleState s) {
-        if (s.fuelPercent != VehicleState.UNKNOWN_INT) {
-            // A canbox may hand over raw litres or a 0-255 byte; until its
-            // scale is known, a value outside 0-100 is dropped rather than
-            // shown. A gauge reading 255% is worse than none.
-            if (s.fuelPercent >= 0 && s.fuelPercent <= 100) {
-                merged.fuelPercent = s.fuelPercent;
-                rememberFuel(s.fuelPercent);
-            } else {
-                Log.w(TAG, "fuel out of range, ignored: " + s.fuelPercent);
-            }
+    private void merge() {
+        VehicleState[] states = new VehicleState[entries.size() + 1];
+        for (int i = 0; i < entries.size(); i++) states[i] = entries.get(i).latest;
+        VehicleState live = VehicleMerge.merge(states);
+        if (live.fuelPercent != VehicleState.UNKNOWN_INT) rememberFuel(live.fuelPercent);
+        states[entries.size()] = memory;
+        merged = VehicleMerge.merge(states);
+        if (live.vin != null && !live.vin.equals(Prefs.get(appCtx, Prefs.CAR_VIN, null))) {
+            Prefs.set(appCtx, Prefs.CAR_VIN, live.vin);
         }
-        if (s.speedKph != VehicleState.UNKNOWN_INT) merged.speedKph = s.speedKph;
-        if (s.rpm != VehicleState.UNKNOWN_INT) merged.rpm = s.rpm;
-        if (s.coolantC != VehicleState.UNKNOWN_INT) merged.coolantC = s.coolantC;
-
-        if (s.doorFrontLeft != VehicleState.Tri.UNKNOWN) merged.doorFrontLeft = s.doorFrontLeft;
-        if (s.doorFrontRight != VehicleState.Tri.UNKNOWN) merged.doorFrontRight = s.doorFrontRight;
-        if (s.doorRearLeft != VehicleState.Tri.UNKNOWN) merged.doorRearLeft = s.doorRearLeft;
-        if (s.doorRearRight != VehicleState.Tri.UNKNOWN) merged.doorRearRight = s.doorRearRight;
-        if (s.boot != VehicleState.Tri.UNKNOWN) merged.boot = s.boot;
-        if (s.handbrake != VehicleState.Tri.UNKNOWN) merged.handbrake = s.handbrake;
-        if (s.reverse != VehicleState.Tri.UNKNOWN) merged.reverse = s.reverse;
 
         lastUpdate = System.currentTimeMillis();
         List<VehicleState.Listener> snapshot;
@@ -182,15 +180,22 @@ public final class VehicleHub {
     }
 
     private void rememberFuel(int percent) {
-        prefs().edit().putInt("veh_fuel", percent)
-                .putLong("veh_fuel_at", System.currentTimeMillis()).apply();
+        long now = System.currentTimeMillis();
+        // Live data arrives several times a second: write only on a change, or now and then to stay fresh.
+        if (percent == memory.fuelPercent && now - rememberedAt < 60_000L) return;
+        memory.fuelPercent = percent;
+        rememberedAt = now;
+        prefs().edit().putInt("veh_fuel", percent).putLong("veh_fuel_at", now).apply();
     }
 
     private void restoreFuel() {
+        memory.fuelPercent = VehicleState.UNKNOWN_INT;
+        rememberedAt = 0;
         SharedPreferences p = prefs();
         long at = p.getLong("veh_fuel_at", 0L);
         if (at > 0 && System.currentTimeMillis() - at < FUEL_MEMORY_MS) {
-            merged.fuelPercent = p.getInt("veh_fuel", VehicleState.UNKNOWN_INT);
+            memory.fuelPercent = p.getInt("veh_fuel", VehicleState.UNKNOWN_INT);
         }
+        merged = VehicleMerge.merge(memory);
     }
 }
