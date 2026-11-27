@@ -1,7 +1,9 @@
 package ie.claudius.cardash;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.util.TypedValue;
 import android.widget.TextView;
 
@@ -17,6 +19,8 @@ public class FitText extends TextView {
     private float minPx = 12, maxPx = 200;
     private String sample;
     private float applied;
+    private boolean centreInk;
+    private final Rect ink = new Rect();
 
     public FitText(Context ctx) {
         super(ctx);
@@ -28,6 +32,33 @@ public class FitText extends TextView {
         this.minPx = minPx;
         this.maxPx = maxPx;
         fit();
+    }
+
+    /**
+     * Centre the glyphs themselves, not the line box, between the top and
+     * bottom padding: digits have no descenders and sit well below the
+     * font's ascent, so a centred line box looks off-centre in a card.
+     * The ink is measured on the sample, so it does not shift with the text.
+     */
+    public void setCentreInk(boolean on) {
+        centreInk = on;
+        invalidate();
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        String s = sample != null ? sample : String.valueOf(getText());
+        if (!centreInk || s.isEmpty() || getLayout() == null) {
+            super.onDraw(canvas);
+            return;
+        }
+        getPaint().getTextBounds(s, 0, s.length(), ink);
+        float middle = (getPaddingTop() + getHeight() - getPaddingBottom()) / 2f;
+        float dy = middle - (getBaseline() + (ink.top + ink.bottom) / 2f);
+        canvas.save();
+        canvas.translate(0, dy);
+        super.onDraw(canvas);
+        canvas.restore();
     }
 
     /** Text to size against; null sizes against the current text. */
