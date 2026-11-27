@@ -33,7 +33,7 @@ public final class VehicleHub {
     private static final long FUEL_MEMORY_MS = 24 * 60 * 60 * 1000L;
 
     public static final String MODE_AUTO = "auto", MODE_OBD = "obd",
-            MODE_CAN = "can", MODE_OFF = "off";
+            MODE_CAN = "can", MODE_OFF = "off", MODE_SIM = "sim";
 
     private static VehicleHub shared;
 
@@ -106,12 +106,14 @@ public final class VehicleHub {
         restoreFuel();
 
         // Listed in merge priority order.
-        VehicleSource[] all = { new ObdSource(), new HcnSource(), new JancarSource() };
+        // The simulator runs alone: pretend and real data never mix.
+        VehicleSource[] all = MODE_SIM.equals(mode) ? new VehicleSource[] { new SimSource() }
+                : new VehicleSource[] { new ObdSource(), new HcnSource(), new JancarSource() };
         for (VehicleSource s : all) {
             final Entry e = new Entry(s);
             entries.add(e);
             e.available = s.isAvailable(appCtx);
-            boolean wanted = MODE_AUTO.equals(mode)
+            boolean wanted = MODE_AUTO.equals(mode) || MODE_SIM.equals(mode)
                     || (MODE_OBD.equals(mode) && s instanceof ObdSource)
                     || (MODE_CAN.equals(mode) && (s instanceof JancarSource || s instanceof HcnSource));
             if (!e.available) {
@@ -165,8 +167,11 @@ public final class VehicleHub {
         VehicleState[] states = new VehicleState[entries.size() + 1];
         for (int i = 0; i < entries.size(); i++) states[i] = entries.get(i).latest;
         VehicleState live = VehicleMerge.merge(states);
-        if (live.fuelPercent != VehicleState.UNKNOWN_INT) rememberFuel(live.fuelPercent);
-        states[entries.size()] = memory;
+        // Simulated values are neither remembered nor topped up from memory.
+        if (!MODE_SIM.equals(runningMode)) {
+            if (live.fuelPercent != VehicleState.UNKNOWN_INT) rememberFuel(live.fuelPercent);
+            states[entries.size()] = memory;
+        }
         merged = VehicleMerge.merge(states);
         if (live.vin != null && !live.vin.equals(Prefs.get(appCtx, Prefs.CAR_VIN, null))) {
             Prefs.set(appCtx, Prefs.CAR_VIN, live.vin);
@@ -201,6 +206,6 @@ public final class VehicleHub {
         if (at > 0 && System.currentTimeMillis() - at < FUEL_MEMORY_MS) {
             memory.fuelPercent = p.getInt("veh_fuel", VehicleState.UNKNOWN_INT);
         }
-        merged = VehicleMerge.merge(memory);
+        merged = MODE_SIM.equals(runningMode) ? new VehicleState() : VehicleMerge.merge(memory);
     }
 }

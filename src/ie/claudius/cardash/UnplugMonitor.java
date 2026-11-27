@@ -38,6 +38,7 @@ public final class UnplugMonitor {
     private UnplugReminder reminder = new UnplugReminder();
     private Context app;
     private boolean attached;
+    private String watching;
     private Runnable onChange;
     private VehicleState last = new VehicleState();
 
@@ -66,6 +67,15 @@ public final class UnplugMonitor {
         boolean want = Prefs.unplugReminder(app) && Prefs.showVehicle(app)
                 && (Prefs.simulating(app) || Prefs.obdAddress(app) != null
                         && !VehicleHub.MODE_CAN.equals(Prefs.vehicleMode(app)));
+        // Switching between real and simulated data starts the count afresh.
+        String source = Prefs.sourceMode(app);
+        if (watching != null && !watching.equals(source)) {
+            reminder = new UnplugReminder();
+            last = new VehicleState();
+            cancel();
+            changed();
+        }
+        watching = source;
         if (want) {
             attached = true;
             // Also restarts the sources if the mode or the dongle changed.

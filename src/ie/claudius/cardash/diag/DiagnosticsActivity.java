@@ -219,6 +219,8 @@ public class DiagnosticsActivity extends Activity {
         sniff.idle = working;
         sniffBody.setText(working);
 
+        simulatorPanel(column);
+
         sourcesBody = panel(column, R.string.diag_sources, R.string.diag_sources_caption, null);
         obdBody = panel(column, R.string.diag_obd, R.string.diag_obd_caption, null);
         bluetoothButton((LinearLayout) obdBody.getParent());
@@ -334,7 +336,7 @@ public class DiagnosticsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        hub.start(this, hubListener, VehicleHub.MODE_AUTO);
+        hub.start(this, hubListener, Prefs.diagMode(this));
         if (sniffer == null && !sniffActions.isEmpty()) resniff(sniffActions);
         main.post(refresh);
     }
@@ -439,6 +441,7 @@ public class DiagnosticsActivity extends Activity {
     private String sourcesText() {
         StringBuilder sb = new StringBuilder();
         long now = System.currentTimeMillis();
+        if (Prefs.simulating(this)) sb.append("SIMULATED VEHICLE: the values below are not from a car\n\n");
         for (VehicleHub.Entry e : hub.entries()) {
             sb.append(e.source.name()).append('\n');
             sb.append("    available  ").append(e.available ? "yes" : "no").append('\n');
@@ -543,6 +546,37 @@ public class DiagnosticsActivity extends Activity {
         lp.topMargin = dp(12);
         lp.leftMargin = 0;
         card.addView(open, 1, lp);
+    }
+
+    // ---- the simulated vehicle -------------------------------------------------------
+
+    private void simulatorPanel(LinearLayout column) {
+        LinearLayout card = cardShell(column, R.string.diag_sim, R.string.diag_sim_caption, null);
+        final TextView toggle = pill("", false, null);
+        final Runnable label = new Runnable() {
+            @Override
+            public void run() {
+                toggle.setText(Prefs.simulating(DiagnosticsActivity.this)
+                        ? R.string.diag_sim_stop : R.string.diag_sim_start);
+            }
+        };
+        toggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean on = !Prefs.simulating(DiagnosticsActivity.this);
+                Prefs.set(DiagnosticsActivity.this, Prefs.SIM, on ? "on" : "off");
+                hub.start(DiagnosticsActivity.this, hubListener, Prefs.diagMode(DiagnosticsActivity.this));
+                label.run();
+                renderSources();
+                renderObd();
+            }
+        });
+        label.run();
+        toggle.setMinHeight(dp(56));
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) toggle.getLayoutParams();
+        lp.topMargin = dp(12);
+        lp.leftMargin = 0;
+        card.addView(toggle, lp);
     }
 
     // ---- the one fact that can't be probed ------------------------------------------
