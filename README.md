@@ -70,12 +70,15 @@ Everything lives behind the gear next to *All apps*. Options are deliberately fe
 The home screen is a grid of cells (12 × 8 on a 1280×720 unit, worked out from the screen size) with any number of pages. It looks the way it always did until you change it.
 
 - **Edit:** long-press empty space or any widget (or the clock → *Edit home screen*, or *Settings → Home screen → Edit*, or *All apps → Edit home screen*).
-- **Move:** drag a widget; it snaps to cells and never lands on another one. **Resize:** drag the round handle in its bottom-right corner. **Settings of a widget:** the gear on it. **Remove:** the X. Everything is 48 dp or bigger.
-- **Add:** *Add* in the bar at the bottom: an app, clock, date, now playing, speedometer, trip, weather, a single vehicle value (coolant, fuel, rpm, speed) as a bar or a gauge with its own minimum, maximum and warning threshold (default coolant 0–120 °C, red from 110), door status, the all-apps button, the settings button, the vehicle strip.
+- **Select:** tap a widget (it is outlined). The bar at the bottom then acts on it, and *Deselect*, a tap on empty space or Back lets go.
+- **Move:** drag the selected widget, or nudge it with the arrow buttons (they hop over neighbours); it snaps to cells and never lands on another one.
+- **Resize:** *Resize*, then the width and height buttons or the round handle in its bottom-right corner.
+- **Settings of a widget** and **Remove** are on the same bar. Everything is 48 dp or bigger, and the grid shrinks to sit above the bar, so nothing hides under it.
+- **Add:** *Add* in the bar at the bottom (or long-press empty space): an app, clock, date, now playing, speedometer, trip, weather, a single vehicle value (coolant, fuel, rpm, speed) as a bar or a gauge with its own minimum, maximum and warning threshold (default coolant 0–120 °C, red from 110), door status, the all-apps button, the settings button, the vehicle strip.
 - **Pages:** swipe sideways between pages. In edit mode, *+ Page* adds an empty page or a ready-made vehicle page (three gauges, doors, speed bar); *Delete page* removes one.
 - **Done** keeps the changes, **Cancel** throws them away, **Default** goes back to the original layout.
 - **All apps:** swipe up from anywhere on the home screen (or add the all-apps button).
-- **Never locked out:** the bar's gear opens Settings in edit mode; long-pressing the clock opens a menu with Settings; the all-apps screen has Settings and *Edit home screen* buttons.
+- **Never locked out:** the bar's *Settings* button opens Settings in edit mode; long-pressing the clock opens a menu with Settings; the all-apps screen has Settings and *Edit home screen* buttons.
 - **Left- or right-hand drive:** *Settings → Steering wheel* mirrors the layout so the clock side is next to the driver.
 
 The layout is stored as JSON in the app's preferences (`home_layout`); the model and its tests are plain Java in `layout/` (`./test.sh`).

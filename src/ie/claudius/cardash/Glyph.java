@@ -18,7 +18,8 @@ import android.graphics.drawable.Drawable;
  */
 public final class Glyph extends Drawable {
 
-    public enum Kind { PREV, PLAY, PAUSE, NEXT, GEAR, PLUS, CLOSE, RESIZE }
+    public enum Kind { PREV, PLAY, PAUSE, NEXT, GEAR, PLUS, CLOSE, RESIZE,
+        MINUS, CHECK, LEFT, RIGHT, UP, DOWN, MOVE, TRASH, PAGES, STYLE, RESET }
 
     private final Kind kind;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -75,6 +76,53 @@ public final class Glyph extends Drawable {
                 stroke(canvas, cx + s * 0.7f, cy - s * 0.1f, cx - s * 0.1f, cy + s * 0.7f, s * 0.2f);
                 stroke(canvas, cx + s * 0.7f, cy - s * 0.7f, cx - s * 0.7f, cy + s * 0.7f, s * 0.2f);
                 break;
+            case MINUS:
+                path.addRoundRect(cx - s * 0.72f, cy - s * 0.14f, cx + s * 0.72f, cy + s * 0.14f,
+                        s * 0.1f, s * 0.1f, Path.Direction.CW);
+                break;
+            case CHECK:
+                lines(canvas, s * 0.24f, cx, cy, s, -0.7f, 0.05f, -0.2f, 0.55f, -0.2f, 0.55f, 0.75f, -0.5f);
+                break;
+            case LEFT:
+                lines(canvas, s * 0.24f, cx, cy, s, 0.35f, -0.7f, -0.35f, 0f, -0.35f, 0f, 0.35f, 0.7f);
+                break;
+            case RIGHT:
+                lines(canvas, s * 0.24f, cx, cy, s, -0.35f, -0.7f, 0.35f, 0f, 0.35f, 0f, -0.35f, 0.7f);
+                break;
+            case UP:
+                lines(canvas, s * 0.24f, cx, cy, s, -0.7f, 0.35f, 0f, -0.35f, 0f, -0.35f, 0.7f, 0.35f);
+                break;
+            case DOWN:
+                lines(canvas, s * 0.24f, cx, cy, s, -0.7f, -0.35f, 0f, 0.35f, 0f, 0.35f, 0.7f, -0.35f);
+                break;
+            case MOVE:
+                // A cross with an arrowhead on each end.
+                lines(canvas, s * 0.18f, cx, cy, s, -0.9f, 0f, 0.9f, 0f, 0f, -0.9f, 0f, 0.9f);
+                lines(canvas, s * 0.18f, cx, cy, s, -0.3f, -0.62f, 0f, -0.92f, 0f, -0.92f, 0.3f, -0.62f,
+                        -0.3f, 0.62f, 0f, 0.92f, 0f, 0.92f, 0.3f, 0.62f);
+                lines(canvas, s * 0.18f, cx, cy, s, -0.62f, -0.3f, -0.92f, 0f, -0.92f, 0f, -0.62f, 0.3f,
+                        0.62f, -0.3f, 0.92f, 0f, 0.92f, 0f, 0.62f, 0.3f);
+                break;
+            case TRASH:
+                lines(canvas, s * 0.18f, cx, cy, s, -0.75f, -0.5f, 0.75f, -0.5f, -0.25f, -0.85f, 0.25f, -0.85f,
+                        -0.55f, -0.5f, -0.45f, 0.85f, -0.45f, 0.85f, 0.45f, 0.85f, 0.45f, 0.85f, 0.55f, -0.5f);
+                break;
+            case PAGES:
+                lines(canvas, s * 0.18f, cx, cy, s, -0.8f, -0.4f, 0.4f, -0.4f, 0.4f, -0.4f, 0.4f, 0.85f,
+                        0.4f, 0.85f, -0.8f, 0.85f, -0.8f, 0.85f, -0.8f, -0.4f,
+                        -0.4f, -0.8f, 0.8f, -0.8f, 0.8f, -0.8f, 0.8f, 0.45f);
+                break;
+            case STYLE:
+                // A circle, half filled.
+                path.addArc(cx - s * 0.8f, cy - s * 0.8f, cx + s * 0.8f, cy + s * 0.8f, 90f, 180f);
+                path.close();
+                ring(canvas, cx, cy, s * 0.8f, 0f, 360f, s * 0.16f);
+                break;
+            case RESET:
+                // An anticlockwise arrow: back to how it was.
+                ring(canvas, cx, cy, s * 0.7f, -150f, 300f, s * 0.2f);
+                lines(canvas, s * 0.2f, cx, cy, s, -0.85f, -0.75f, -0.62f, -0.32f, -0.62f, -0.32f, -0.18f, -0.52f);
+                break;
             case PREV:
                 triangle(cx + s * 0.9f, cy, -s, s);
                 triangle(cx + s * 0.05f, cy, -s, s);
@@ -118,6 +166,21 @@ public final class Glyph extends Drawable {
         p.setStrokeWidth(width);
         p.setStrokeCap(Paint.Cap.ROUND);
         canvas.drawLine(x0, y0, x1, y1, p);
+    }
+
+    /** Line segments given as x0, y0, x1, y1 ... in units of {@code s} about the centre. */
+    private void lines(Canvas canvas, float width, float cx, float cy, float s, float... p) {
+        for (int i = 0; i + 3 < p.length; i += 4) {
+            stroke(canvas, cx + p[i] * s, cy + p[i + 1] * s, cx + p[i + 2] * s, cy + p[i + 3] * s, width);
+        }
+    }
+
+    private void ring(Canvas canvas, float cx, float cy, float r, float from, float sweep, float width) {
+        Paint p = new Paint(paint);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(width);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        canvas.drawArc(cx - r, cy - r, cx + r, cy + r, from, sweep, false, p);
     }
 
     /** Triangle with its apex at (tipX ± width) and base at tipX. */

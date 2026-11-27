@@ -186,6 +186,24 @@ public class HomeLayoutTest {
         check(sz[0] == 2 && sz[1] == 1, "resize never goes below the kind minimum: " + sz[0] + "x" + sz[1]);
         sz = Arrange.resize(l, p, w, 99, 99);
         check(sz[0] == 8 && sz[1] == 8, "resize stops at the grid edge: " + sz[0] + "x" + sz[1]);
+        // Arrow nudges: one cell, hopping over a neighbour, stopping at the edge.
+        int[] nu = Arrange.nudge(l, p, c, 0, 1);
+        check(nu != null && nu[0] == 0 && nu[1] == 1, "nudge down one cell");
+        nu = Arrange.nudge(l, p, c, 1, 0);
+        check(nu != null && nu[0] == 8 && nu[1] == 0, "nudge right hops over the neighbour");
+        check(Arrange.nudge(l, p, c, -1, 0) == null && Arrange.nudge(l, p, c, 0, -1) == null
+                && Arrange.nudge(l, p, c, 0, 0) == null, "nudge stops at the edge");
+        // Width and height buttons.
+        check(Arrange.step(l, p, c, 1, 0) == null, "cannot widen into a neighbour");
+        int[] stp = Arrange.step(l, p, c, 0, 1);
+        check(stp != null && stp[0] == 4 && stp[1] == 3, "one taller");
+        stp = Arrange.step(l, p, c, -1, 0);
+        check(stp != null && stp[0] == 3, "one narrower");
+        c.w = 2;
+        c.h = 1;
+        check(Arrange.step(l, p, c, -1, 0) == null && Arrange.step(l, p, c, 0, -1) == null, "not under the minimum");
+        c.w = 4;
+        c.h = 2;
         // Fill the page, then there is no room.
         HomeLayout f = new HomeLayout(2, 2);
         HomeLayout.Page fp = new HomeLayout.Page();
