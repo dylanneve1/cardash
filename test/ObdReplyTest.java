@@ -1,6 +1,7 @@
 import ie.claudius.cardash.vehicle.ObdReply;
 import ie.claudius.cardash.vehicle.ObdSchedule;
 import ie.claudius.cardash.vehicle.RateMeter;
+import ie.claudius.cardash.vehicle.VehicleField;
 
 import java.util.Arrays;
 import java.util.List;
@@ -104,9 +105,52 @@ public class ObdReplyTest {
 
         // Intake air is only asked when there is no ambient PID.
         sch = new ObdSchedule(new TreeSet<>(Arrays.asList(0x46, 0x0F)), true);
-        check(has(sch.next(0), 0x46) && !sch.wants(0x0F), "ambient replaces intake");
+        r = sch.next(0);
+        check(r.get(0)[0] == 0x46 && has(r, 0x0F), "intake follows the ambient air as engine data");
         sch = new ObdSchedule(new TreeSet<>(Arrays.asList(0x0F)), true);
         check(has(sch.next(0), 0x0F), "intake as the fallback");
+
+        // Engine data PIDs answer with their own lengths, batched together.
+        m = ObdReply.mode01("00E\r0:41047F10012C42\r1:35E85C826BAAAAAA\r", 0x04, 0x10, 0x42, 0x5C);
+        check(m.size() == 4 && eq(m.get(0x04), 0x7F) && eq(m.get(0x10), 0x01, 0x2C)
+                && eq(m.get(0x42), 0x35, 0xE8) && eq(m.get(0x5C), 0x82), "engine PIDs in one reply " + m.keySet());
+        for (VehicleField f : VehicleField.all()) check(ObdReply.length(f.pid) == f.bytes, "length of " + f.id);
+        check(ObdReply.length(0x01) == -1, "an unknown PID has no length");
+
+        // Engine data is only asked when the bitmaps list it.
+        sch = new ObdSchedule(null, true);
+        for (long t = 0; t < 60000; t += 100) {
+            for (int[] q : sch.next(t)) check(!has(q, 0x04) && !has(q, 0x42), "no engine data without bitmaps");
+        }
+        Set<Integer> most = new TreeSet<>();
+        for (VehicleField f : VehicleField.all()) most.add(f.pid);
+        // On CAN: six per request, core values first, and everything comes round.
+        sch = new ObdSchedule(most, true);
+        r = sch.next(0);
+        check(r.size() == 1 && r.get(0).length == 6 && r.get(0)[2] == 0x05 && r.get(0)[3] == 0x2F
+                && r.get(0)[4] == 0x46, "core before engine data " + Arrays.toString(r.get(0)));
+        coverage(sch, most, 100, 10_000L, "CAN");
+        // One PID per request: at most one slow one a cycle, and RPM/speed keep most of the link.
+        sch = new ObdSchedule(most, false);
+        coverage(sch, most, 700, 45_000L, "single");   // 21 values sharing under one request a second
+        sch = new ObdSchedule(most, false);
+        int slow = 0, engine = 0, last = -1, twice = 0;
+        for (long t = 0; t < 120_000; t += 500) {
+            r = sch.next(t);
+            check(r.size() <= 3, "one slow PID at most");
+            if (r.size() == 3) {
+                slow++;
+                int p = r.get(2)[0];
+                boolean core = p == 0x05 || p == 0x2F || p == 0x46;
+                if (!core) engine++;
+                if (!core && last == 0 && t > 5000) twice++;
+                last = core ? 1 : 0;
+            } else last = -1;
+        }
+        check(engine > 60 && twice == 0 && slow < 240, "engine data every other cycle: " + engine + " " + twice);
+        check(ObdSchedule.staleAfter(0x05) == 6000 && new ObdSchedule(most, false).staleFor(0x04) == 90_000
+                && new ObdSchedule(most, true).staleFor(0x04) == 10_000
+                && new ObdSchedule(most, true).staleFor(0x0C) == 3000, "how long values are kept");
 
         RateMeter rm = new RateMeter();
         for (int i = 0; i <= 50; i++) rm.record(i * 100);
@@ -118,6 +162,32 @@ public class ObdReplyTest {
             System.exit(1);
         }
         System.out.println("ObdReplyTest: all passed");
+    }
+
+    /**
+     * Run two minutes of cycles: every PID is asked, and none that was read
+     * would have gone stale before its next turn.
+     */
+    private static void coverage(ObdSchedule sch, Set<Integer> pids, long cycle, long longest, String what) {
+        Map<Integer, Long> last = new java.util.HashMap<>();
+        for (long t = 0; t < 120_000; t += cycle) {
+            for (int[] q : sch.next(t)) {
+                for (int p : q) {
+                    Long was = last.put(p, t);
+                    if (was == null) continue;
+                    VehicleField f = VehicleField.byPid(p);
+                    check(t - was <= sch.staleFor(p), what + ": " + f.id + " stale after " + (t - was));
+                    check(f.interval >= 15_000 || t - was <= Math.max(longest, f.interval * 2L),
+                            what + ": " + f.id + " waited " + (t - was));
+                }
+            }
+        }
+        check(last.keySet().containsAll(pids), what + ": every PID asked, missing some of " + last.keySet());
+    }
+
+    private static boolean has(int[] q, int pid) {
+        for (int p : q) if (p == pid) return true;
+        return false;
     }
 
     private static boolean has(List<int[]> reqs, int pid) {

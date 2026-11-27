@@ -47,6 +47,7 @@ import ie.claudius.cardash.vehicle.HcnSource;
 import ie.claudius.cardash.vehicle.JancarSource;
 import ie.claudius.cardash.vehicle.ObdSource;
 import ie.claudius.cardash.vehicle.VehicleHub;
+import ie.claudius.cardash.vehicle.VehicleField;
 import ie.claudius.cardash.vehicle.VehicleState;
 
 /**
@@ -467,6 +468,13 @@ public class DiagnosticsActivity extends Activity {
                 .append(" boot=").append(m.boot)
                 .append(" bonnet=").append(m.bonnet).append("\n        handbrake=").append(m.handbrake)
                 .append(" reverse=").append(m.reverse).append('\n');
+        for (VehicleField f : VehicleField.all()) {
+            Float engine = m.engine.get(f.pid);
+            if (engine != null) {
+                sb.append("        ").append(f.label).append(": ").append(f.format(engine))
+                        .append(' ').append(f.unit).append('\n');
+            }
+        }
         return sb.toString();
     }
 

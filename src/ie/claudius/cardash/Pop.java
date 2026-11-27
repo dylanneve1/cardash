@@ -135,6 +135,35 @@ final class Pop {
         return this;
     }
 
+    /** A label over exclusive options in rows of three, for long lists. */
+    Pop grid(String label, String[] values, String[] labels, String current, final Choice cb) {
+        TextView l = new TextView(ctx);
+        l.setText(label);
+        l.setTypeface(Fonts.body(ctx));
+        l.setTextColor(m3.onSurfaceVariant());
+        l.setTextSize(14);
+        l.setPadding(dp(4), dp(6), 0, dp(4));
+        body.addView(l);
+        LinearLayout row = null;
+        for (int i = 0; i < values.length; i++) {
+            if (i % 3 == 0) {
+                row = new LinearLayout(ctx);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setWeightSum(3f);
+                body.addView(row);
+            }
+            final String v = values[i];
+            TextView opt = pill(labels[i], v.equals(current));
+            opt.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { cb.on(v); }
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(48), 1f);
+            lp.setMargins(dp(4), dp(4), dp(4), dp(4));
+            row.addView(opt, lp);
+        }
+        return this;
+    }
+
     private static String title(String v) {
         if (v.isEmpty()) return v;
         return Character.toUpperCase(v.charAt(0)) + v.substring(1);

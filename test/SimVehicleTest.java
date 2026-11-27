@@ -1,4 +1,5 @@
 import ie.claudius.cardash.vehicle.SimVehicle;
+import ie.claudius.cardash.vehicle.VehicleField;
 import ie.claudius.cardash.vehicle.VehicleState;
 
 /** The simulated vehicle: settings by name, bad input, and the drive cycle. */
@@ -53,6 +54,39 @@ public class SimVehicleTest {
         s.apply(SimVehicle.pairs("cycle=1"), 0);
         s.apply(SimVehicle.pairs("speed=30"), 1000);
         check(!s.cycling() && s.state(1000).speedKph == 30, "a manual value stops the cycle");
+
+        // Engine readings: plausible, following the engine, settable and removable.
+        s.apply(SimVehicle.pairs("reset=1"), 0);
+        v = s.state(0);
+        for (VehicleField f : VehicleField.all()) {
+            Float x = f.value(v);
+            check(x != null && x >= f.min && x <= f.max, "idle " + f.id + " = " + x);
+        }
+        float idleMaf = v.engine.get(0x10);
+        check(v.engine.get(0x42) > 13.5f && idleMaf > 1 && idleMaf < 10, "idle volts and air " + idleMaf);
+        s.apply(SimVehicle.pairs("rpm=0"), 0);
+        v = s.state(0);
+        check(v.engine.get(0x10) == 0 && v.engine.get(0x04) == 0 && v.engine.get(0x42) < 13f, "engine off");
+        check(s.apply(SimVehicle.pairs("voltage=11.2,oiltemp=na,intake=33,mildist=12"), 0).isEmpty(), "engine settable");
+        v = s.state(0);
+        check(Math.abs(v.engine.get(0x42) - 11.2f) < 0.001f && !v.engine.containsKey(0x5C) && v.intakeC == 33
+                && v.engine.get(0x21) == 12, "engine overrides");
+        check(s.apply(SimVehicle.pairs("voltage=lots,load=NaN"), 0).contains("voltage=lots"), "bad engine value");
+        s.apply(SimVehicle.pairs("cycle=1"), 0);
+        float low = 100, high = 0;
+        for (long t = 0; t < SimVehicle.CYCLE_MS; t += 500) {
+            v = s.state(t);
+            check(!v.engine.containsKey(0x5C), "na stays na in the cycle");
+            for (VehicleField f : VehicleField.all()) {
+                Float x = f.value(v);
+                if (x != null) check(x >= f.min && x <= Math.max(f.max, 65535), "cycle " + f.id + " = " + x);
+            }
+            low = Math.min(low, v.engine.get(0x04));
+            high = Math.max(high, v.engine.get(0x04));
+        }
+        check(low == 0 && high > 60 && s.state(20_000).engine.get(0x42) > 13, "the drive moves the engine data " + high);
+        s.apply(SimVehicle.pairs("reset=1"), 0);
+        check(s.state(0).engine.containsKey(0x5C), "reset brings them back");
 
         if (failures > 0) {
             System.out.println(failures + " failures");

@@ -17,6 +17,7 @@ import ie.claudius.cardash.layout.Arrange;
 import ie.claudius.cardash.layout.HomeLayout;
 import ie.claudius.cardash.layout.HomeLayout.Item;
 import ie.claudius.cardash.layout.Kind;
+import ie.claudius.cardash.vehicle.VehicleField;
 
 /**
  * Edit mode: the toolbar and the dialogs. There is one toolbar along the
@@ -127,7 +128,8 @@ final class HomeEditor implements GridPage.Edit {
 
     private void itemButtons(final Item it) {
         Kind k = Kind.of(it.type);
-        String name = Kind.VEHICLE.equals(it.type) ? Kind.vehicleLabel(it.get("field", "coolant"))
+        String name = Kind.LIST.equals(it.type) ? listName(it.get("set", Kind.LIST_CAR))
+                : Kind.VEHICLE.equals(it.type) ? Kind.vehicleLabel(it.get("field", "coolant"))
                 : k == null ? it.type : k.label;
         TextView title = caption(name, 14, m3.primary());
         title.setMaxLines(2);
@@ -329,18 +331,24 @@ final class HomeEditor implements GridPage.Edit {
             });
         }
         for (final Kind.Option o : k.options) {
-            if (o.isChoice()) {
+            if (Kind.VEHICLE.equals(it.type) && "field".equals(o.key)) {
+                // Too many values for a row of pills: a grid, three across.
+                String[] labels = new String[o.choices.length];
+                for (int i = 0; i < labels.length; i++) labels[i] = Kind.vehicleLabel(o.choices[i]);
+                pop.grid(o.label, o.choices, labels, it.get(o.key, o.def), new Pop.Choice() {
+                    @Override public void on(String v) {
+                        // A new value brings its own usual range and warning.
+                        String style = it.get("style", "bar");
+                        it.settings.putAll(Kind.vehicleDefaults(v));
+                        it.settings.put("style", style);
+                        pop.dismiss();   // rebuilds; then reopen with the new field's numbers
+                        gear(it);
+                    }
+                });
+            } else if (o.isChoice()) {
                 pop.choices(o.label, o.choices, it.get(o.key, o.def), new Pop.Choice() {
                     @Override public void on(String v) {
                         it.settings.put(o.key, v);
-                        if (Kind.VEHICLE.equals(it.type) && "field".equals(o.key)) {
-                            // A new value brings its own usual range and warning.
-                            String style = it.get("style", "bar");
-                            it.settings.putAll(Kind.vehicleDefaults(v));
-                            it.settings.put("style", style);
-                            pop.dismiss();   // rebuilds; then reopen with the new field's numbers
-                            gear(it);
-                        }
                     }
                 });
             } else {
@@ -361,29 +369,46 @@ final class HomeEditor implements GridPage.Edit {
     // ---- add ---------------------------------------------------------------------------
 
     private static final class Entry {
-        final String label, kind, field;
-        Entry(String label, String kind, String field) { this.label = label; this.kind = kind; this.field = field; }
+        final String label, kind;
+        /** The vehicle field, or the value list's set; null for other kinds. */
+        final String value;
+        Entry(String label, String kind, String value) { this.label = label; this.kind = kind; this.value = value; }
+    }
+
+    private String listName(String set) {
+        return act.getString(Kind.LIST_ENGINE.equals(set) ? R.string.engine_data : R.string.car_list);
     }
 
     void addPicker() {
         final List<Entry> entries = new ArrayList<>();
         entries.add(new Entry(act.getString(R.string.edit_app), Kind.APP, null));
         for (Kind k : Kind.all()) {
-            if (Kind.APP.equals(k.id)) continue;
-            if (Kind.VEHICLE.equals(k.id)) {
-                for (String f : new String[] { "coolant", "fuel", "rpm", "speed", "outside" }) {
-                    entries.add(new Entry(Kind.vehicleLabel(f), k.id, f));
+            if (Kind.APP.equals(k.id) || Kind.VEHICLE.equals(k.id)) continue;
+            if (Kind.LIST.equals(k.id)) {
+                for (String set : new String[] { Kind.LIST_CAR, Kind.LIST_ENGINE }) {
+                    entries.add(new Entry(listName(set), k.id, set));
                 }
             } else {
                 entries.add(new Entry(k.label, k.id, null));
             }
         }
         final Pop pop = new Pop(act, m3, act.getString(R.string.edit_add_title));
+        addRows(pop, entries);
+        List<Entry> values = new ArrayList<>();
+        for (VehicleField f : VehicleField.all()) values.add(new Entry(f.label, Kind.VEHICLE, f.id));
+        pop.note(act.getString(R.string.edit_add_values));
+        addRows(pop, values);
+        pop.button(act.getString(android.R.string.cancel), null, false);
+        pop.show();
+    }
+
+    private void addRows(final Pop pop, List<Entry> entries) {
         LinearLayout row = null;
         for (int i = 0; i < entries.size(); i++) {
             if (i % 3 == 0) {
                 row = new LinearLayout(act);
                 row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setWeightSum(3f);
                 pop.body.addView(row);
             }
             final Entry e = entries.get(i);
@@ -395,8 +420,6 @@ final class HomeEditor implements GridPage.Edit {
             lp.setMargins(dp(4), dp(4), dp(4), dp(4));
             row.addView(b, lp);
         }
-        pop.button(act.getString(android.R.string.cancel), null, false);
-        pop.show();
     }
 
     /** A classic cluster page shows no widgets, so nothing is added to it unseen. */
@@ -418,7 +441,8 @@ final class HomeEditor implements GridPage.Edit {
             Toast.makeText(act, R.string.edit_no_room, Toast.LENGTH_SHORT).show();
             return;
         }
-        if (e.field != null) it.settings.putAll(Kind.vehicleDefaults(e.field));
+        if (Kind.VEHICLE.equals(e.kind)) it.settings.putAll(Kind.vehicleDefaults(e.value));
+        else if (Kind.LIST.equals(e.kind)) it.settings.put("set", e.value);
         added(it);
     }
 
@@ -490,6 +514,9 @@ final class HomeEditor implements GridPage.Edit {
                 })
                 .row(act.getString(R.string.edit_page_vehicle), new Runnable() {
                     @Override public void run() { insertPage(LayoutStore.carPage(act)); }
+                })
+                .row(act.getString(R.string.edit_page_engine), new Runnable() {
+                    @Override public void run() { insertPage(LayoutStore.enginePage(act)); }
                 })
                 .button(act.getString(android.R.string.cancel), null, false)
                 .show();

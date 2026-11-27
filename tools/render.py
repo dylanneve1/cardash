@@ -606,10 +606,10 @@ def home(design, apps, chips, path, **over):
 
         # Small-card heights (WRAP_CONTENT); the first widget is tall.
         f_temp, f_desc = Face("display", 30, padding=False), Face("body", 14)
-        f_ttitle, f_tdist, f_tdet = Face("display", 13), Face("display", 30, padding=False), Face("body", 14)
+        f_ttitle, f_tdist, f_tdet = Face("display", 14), Face("hero", 26, padding=False), Face("display", 12)
         small_h = {
             "weather": dp(14) + f_temp.height + dp(4) + f_desc.height + dp(14),
-            "trip": dp(14) + f_ttitle.height + dp(2) + f_tdist.height + dp(4) + f_tdet.height + dp(14),
+            "trip": dp(14) + f_ttitle.height + dp(6) + f_tdist.height + dp(8) + f_tdet.height + dp(14),
         }
         small_total = sum(small_h[w] + dp(12) for w in widgets[1:])
         tall_box = (mx0, pad, mx1, H - pad - small_total)
@@ -634,25 +634,20 @@ def home(design, apps, chips, path, **over):
             fd.draw(d, (mmid, ty + ft.height + gap), desc, dim, "center")
 
         def trip_card(box, tall):
-            rounded(d, box, FAMILY[0], p["tertiaryContainer"])
-            on = p["onTertiaryContainer"]
-            f1 = Face("display", 16 if tall else 13)
-            f2 = Face("hero" if tall else "display", 64 if tall else 30, padding=False)
-            f3 = Face("body", 18 if tall else 14)
-            f4 = Face("body", 12)
-            g1, g2 = dp(8 if tall else 2), dp(8 if tall else 4)
+            # The trip is a neutral pill like the other values (ValueView, stacked or in a row).
+            rounded(d, box, (28,) * 4, p["surfaceContainer"])
+            on, dim = p["onSurface"], p["onSurfaceVariant"]
             dist, detail = trip_text(c["trip"][0], c["trip"][1], miles)
-            bh = f1.height + g1 + f2.height + g2 + f3.height + (dp(18) + f4.height if tall else 0)
-            ty = box[1] + dp(14) if not tall else box[1] + ((box[3] - box[1]) - bh) / 2
-            f1.draw(d, (mmid, ty), "Trip", blend(on, p["tertiaryContainer"], 0xB3 / 255), "center")
-            ty += f1.height + g1
-            f2.draw(d, (mmid, ty), dist, on, "center")
-            ty += f2.height + g2
-            f3.draw(d, (mmid, ty), detail, blend(on, p["tertiaryContainer"], 0xCC / 255), "center")
-            if tall:
-                ty += f3.height + dp(18)
-                f4.draw(d, (mmid, ty), "Hold to reset", blend(on, p["tertiaryContainer"], 0x80 / 255),
-                        "center")
+            f1 = Face("display", 18 if tall else 14)
+            f2 = Face("hero", 48 if tall else 26, padding=False)
+            f3 = Face("display", 15 if tall else 12)
+            bh = f1.height + dp(6) + f2.height + dp(8) + f3.height
+            x = box[0] + dp(22)
+            ty = box[1] + ((box[3] - box[1]) - bh) / 2
+            f1.draw(d, (x, ty), "Trip", dim)
+            ty += f1.height + dp(6)
+            f2.draw(d, (x, ty), dist, on)
+            f3.draw(d, (x, ty + f2.height + dp(8)), detail, dim)
 
         for i, w in enumerate(widgets):
             tall = i == 0

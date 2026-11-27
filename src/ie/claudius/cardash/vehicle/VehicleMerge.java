@@ -27,6 +27,9 @@ public final class VehicleMerge {
             m.outsideC = first(m.outsideC, s.outsideC);
             m.intakeC = first(m.intakeC, s.intakeC);
             m.odometerKm = first(m.odometerKm, s.odometerKm);
+            for (java.util.Map.Entry<Integer, Float> e : s.engine.entrySet()) {
+                if (!m.engine.containsKey(e.getKey())) m.engine.put(e.getKey(), e.getValue());
+            }
             m.doorFrontLeft = first(m.doorFrontLeft, s.doorFrontLeft);
             m.doorFrontRight = first(m.doorFrontRight, s.doorFrontRight);
             m.doorRearLeft = first(m.doorRearLeft, s.doorRearLeft);
