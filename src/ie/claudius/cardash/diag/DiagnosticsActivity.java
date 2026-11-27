@@ -42,6 +42,7 @@ import ie.claudius.cardash.Prefs;
 import ie.claudius.cardash.R;
 import ie.claudius.cardash.Receivers;
 import ie.claudius.cardash.Shapes;
+import ie.claudius.cardash.bt.BluetoothActivity;
 import ie.claudius.cardash.vehicle.JancarSource;
 import ie.claudius.cardash.vehicle.ObdSource;
 import ie.claudius.cardash.vehicle.VehicleHub;
@@ -213,6 +214,7 @@ public class DiagnosticsActivity extends Activity {
 
         sourcesBody = panel(column, R.string.diag_sources, R.string.diag_sources_caption, null);
         obdBody = panel(column, R.string.diag_obd, R.string.diag_obd_caption, null);
+        bluetoothButton((LinearLayout) obdBody.getParent());
 
         keysBody = panel(column, R.string.diag_keys, R.string.diag_keys_caption, keys);
         keys.body = keysBody;
@@ -449,6 +451,8 @@ public class DiagnosticsActivity extends Activity {
         StringBuilder sb = new StringBuilder();
         sb.append("paired devices (").append(d.paired.size()).append("):\n");
         for (String p : d.paired) sb.append("  ").append(p).append('\n');
+        sb.append("chosen dongle: ")
+                .append(d.chosen == null ? "none (matching paired devices by name)" : d.chosen).append('\n');
         sb.append("matched as dongle: ").append(d.matched == null ? "none" : d.matched).append('\n');
         sb.append("socket: ").append(d.socket).append('\n');
         if (!d.raw.isEmpty()) {
@@ -466,6 +470,21 @@ public class DiagnosticsActivity extends Activity {
 
     private void renderObd() {
         if (obdBody != null) obdBody.setText(obdText());
+    }
+
+    /** From the OBD panel to the screen that pairs and picks the dongle. */
+    private void bluetoothButton(LinearLayout card) {
+        TextView open = pill(getString(R.string.diag_bt_open), true, new Runnable() {
+            @Override
+            public void run() {
+                startActivity(new Intent(DiagnosticsActivity.this, BluetoothActivity.class));
+            }
+        });
+        open.setMinHeight(dp(56));
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) open.getLayoutParams();
+        lp.topMargin = dp(12);
+        lp.leftMargin = 0;
+        card.addView(open, 1, lp);
     }
 
     // ---- the one fact that can't be probed ------------------------------------------

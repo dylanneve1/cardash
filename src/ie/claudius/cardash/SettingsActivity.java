@@ -13,6 +13,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import ie.claudius.cardash.bt.BluetoothActivity;
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.diag.DiagnosticsActivity;
 import ie.claudius.cardash.remote.QrView;
@@ -215,6 +216,9 @@ public class SettingsActivity extends Activity {
                 }));
         card.addView(divider());
         card.addView(remoteRow());
+        card.addView(divider());
+        card.addView(linkRow(R.string.s_bt, R.string.s_bt_caption, R.string.s_diag_open,
+                new Intent(this, BluetoothActivity.class)));
         card.addView(divider());
         card.addView(linkRow(R.string.s_diag, R.string.s_diag_caption, R.string.s_diag_open,
                 new Intent(this, DiagnosticsActivity.class)));
