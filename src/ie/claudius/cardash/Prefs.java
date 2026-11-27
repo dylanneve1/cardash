@@ -44,6 +44,9 @@ public final class Prefs {
     /** LAN settings page for a phone (issue #1); off until asked for. */
     public static final String REMOTE = "remote";     // off | on
     public static final String CANBOX_PROTOCOLS = "canbox_protocols";
+    /** The OBD dongle chosen on the Bluetooth screen; absent = match a paired device by name. */
+    public static final String OBD_ADDRESS = "obd_address";
+    public static final String OBD_NAME = "obd_name";
 
     public static final String W_SPEEDO = "speedo", W_TRIP = "trip", W_WEATHER = "weather";
     public static final String[] DASH_ALL = { W_SPEEDO, W_TRIP, W_WEATHER };
@@ -74,6 +77,27 @@ public final class Prefs {
 
     public static void set(Context ctx, String key, String value) {
         prefs(ctx).edit().putString(key, value).apply();
+    }
+
+    // ---- OBD dongle -------------------------------------------------------
+
+    /** The chosen dongle's Bluetooth address, or null when none was chosen. */
+    public static String obdAddress(Context ctx) {
+        String a = get(ctx, OBD_ADDRESS, "");
+        return a.isEmpty() ? null : a;
+    }
+
+    /** What the chosen dongle was called when chosen, for when it is no longer paired. */
+    public static String obdName(Context ctx) {
+        return get(ctx, OBD_NAME, "");
+    }
+
+    public static void setObdDongle(Context ctx, String address, String name) {
+        prefs(ctx).edit().putString(OBD_ADDRESS, address).putString(OBD_NAME, name).apply();
+    }
+
+    public static void clearObdDongle(Context ctx) {
+        prefs(ctx).edit().remove(OBD_ADDRESS).remove(OBD_NAME).apply();
     }
 
     // ---- typed readers ----------------------------------------------------
