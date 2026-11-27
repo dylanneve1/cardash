@@ -16,11 +16,14 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import ie.claudius.cardash.Apps;
 import ie.claudius.cardash.Prefs;
+import ie.claudius.cardash.vehicle.SimVehicle;
+import ie.claudius.cardash.vehicle.VehicleState;
 
 /**
  * Serves {@link RemoteForm} on the local network while "Phone settings"
@@ -155,6 +158,21 @@ public final class RemoteServer {
         @Override
         public List<String[]> apps() {
             return Apps.labels(app);
+        }
+
+        @Override
+        public Map<String, String> sim() {
+            if (!Prefs.simulating(app)) return null;
+            Map<String, String> out = new LinkedHashMap<>();
+            for (Map.Entry<String, Integer> e : SimVehicle.SHARED.values(System.currentTimeMillis()).entrySet()) {
+                if (e.getValue() != VehicleState.UNKNOWN_INT) out.put(e.getKey(), String.valueOf(e.getValue()));
+            }
+            return out;
+        }
+
+        @Override
+        public void simApply(Map<String, String> changes) {
+            SimVehicle.SHARED.apply(changes, System.currentTimeMillis());
         }
     };
 

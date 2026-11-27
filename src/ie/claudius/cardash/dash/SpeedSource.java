@@ -44,6 +44,9 @@ public final class SpeedSource {
     public interface Listener {
         void onSpeed(float kph, boolean hasFix);
 
+        /** Direction of travel in degrees from north, while moving fast enough for it to mean something. */
+        void onHeading(float degrees);
+
         /** The first usable position only — enough to place the weather. */
         void onPosition(double lat, double lon);
 
@@ -165,6 +168,7 @@ public final class SpeedSource {
             }
         }
         previous = l;
+        if (l.hasBearing() && kph >= MIN_DERIVED_KPH) listener.onHeading(l.getBearing());
         listener.onSpeed(kph, known);
     }
 

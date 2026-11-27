@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, next]
   pull_request:
 
 jobs:
@@ -25,7 +25,10 @@ jobs:
         run: ./test.sh
 
       - name: Build APK
-        # A throwaway key: CI proves the build, it does not sign releases.
+        # A fixed, public TEST key (ci/test-signing.jks) so every CI APK installs over the last one.
+        # It signs test builds only; releases will use a separate secret key.
+        env:
+          CARDASH_KEYSTORE: ci/test-signing.jks
         run: ./build.sh
 
       - name: Check the APK is what the head unit needs

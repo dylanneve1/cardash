@@ -1,6 +1,5 @@
 package ie.claudius.cardash;
 
-import android.animation.LayoutTransition;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Interpolator;
@@ -107,6 +106,11 @@ public final class Motion {
                 }).start();
     }
 
+    /** Live readouts: replace the text with no animation at all, and only when it differs. */
+    public static void setText(TextView t, CharSequence text) {
+        if (!text.toString().contentEquals(t.getText())) t.setText(text);
+    }
+
     /** Fade a freshly-set image in rather than letting it snap. */
     public static void reveal(View v) {
         v.animate().cancel();
@@ -137,22 +141,5 @@ public final class Motion {
                         shell.removeView(old);
                     }
                 }).start();
-    }
-
-    /** Children that appear, disappear or resize animate into place. */
-    public static void animateChildren(ViewGroup g) {
-        LayoutTransition lt = new LayoutTransition();
-        lt.enableTransitionType(LayoutTransition.CHANGING);
-        lt.setDuration(ms(300));
-        lt.setInterpolator(LayoutTransition.APPEARING, EMPHASIZED);
-        lt.setInterpolator(LayoutTransition.DISAPPEARING, EXIT);
-        lt.setInterpolator(LayoutTransition.CHANGE_APPEARING, STANDARD);
-        lt.setInterpolator(LayoutTransition.CHANGE_DISAPPEARING, STANDARD);
-        lt.setInterpolator(LayoutTransition.CHANGING, STANDARD);
-        lt.setStartDelay(LayoutTransition.APPEARING, ms(120));
-        lt.setStartDelay(LayoutTransition.CHANGE_APPEARING, 0);
-        lt.setStartDelay(LayoutTransition.CHANGE_DISAPPEARING, 0);
-        lt.setStartDelay(LayoutTransition.CHANGING, 0);
-        g.setLayoutTransition(lt);
     }
 }

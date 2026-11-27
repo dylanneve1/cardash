@@ -22,19 +22,63 @@ public final class VehicleState {
     public int rpm = UNKNOWN_INT;
     public int coolantC = UNKNOWN_INT;
 
+    /** Outside (ambient) air temperature. */
+    public int outsideC = UNKNOWN_INT;
+    /** Engine intake air temperature: only ever shown labelled as such, where outside is unknown. */
+    public int intakeC = UNKNOWN_INT;
+    public int odometerKm = UNKNOWN_INT;
+
     public Tri doorFrontLeft = Tri.UNKNOWN;
     public Tri doorFrontRight = Tri.UNKNOWN;
     public Tri doorRearLeft = Tri.UNKNOWN;
     public Tri doorRearRight = Tri.UNKNOWN;
     public Tri boot = Tri.UNKNOWN;
+    public Tri bonnet = Tri.UNKNOWN;
     public Tri handbrake = Tri.UNKNOWN;
     public Tri reverse = Tri.UNKNOWN;
+
+    /** The OBD adapter is connected (whether or not the car answers). */
+    public boolean obdLinked;
+    /** Wall-clock millis of the last valid OBD data reply, 0 for never. */
+    public long obdReplyMillis;
+
+    /** The car's VIN, or null. */
+    public String vin;
+    /** The car says it has no fuel level on OBD and nothing else reports one: show "unavailable". */
+    public boolean fuelUnsupported;
+
+    /** A snapshot that later writes to this one don't touch. */
+    public VehicleState copy() {
+        VehicleState c = new VehicleState();
+        c.fuelPercent = fuelPercent;
+        c.speedKph = speedKph;
+        c.rpm = rpm;
+        c.coolantC = coolantC;
+        c.outsideC = outsideC;
+        c.intakeC = intakeC;
+        c.odometerKm = odometerKm;
+        c.doorFrontLeft = doorFrontLeft;
+        c.doorFrontRight = doorFrontRight;
+        c.doorRearLeft = doorRearLeft;
+        c.doorRearRight = doorRearRight;
+        c.boot = boot;
+        c.bonnet = bonnet;
+        c.handbrake = handbrake;
+        c.reverse = reverse;
+        c.obdLinked = obdLinked;
+        c.obdReplyMillis = obdReplyMillis;
+        c.vin = vin;
+        c.fuelUnsupported = fuelUnsupported;
+        return c;
+    }
 
     public boolean hasAnything() {
         return fuelPercent != UNKNOWN_INT
                 || speedKph != UNKNOWN_INT
                 || rpm != UNKNOWN_INT
                 || coolantC != UNKNOWN_INT
+                || outsideC != UNKNOWN_INT
+                || intakeC != UNKNOWN_INT
                 || anyDoorKnown();
     }
 
@@ -43,24 +87,28 @@ public final class VehicleState {
                 || doorFrontRight != Tri.UNKNOWN
                 || doorRearLeft != Tri.UNKNOWN
                 || doorRearRight != Tri.UNKNOWN
-                || boot != Tri.UNKNOWN;
+                || boot != Tri.UNKNOWN
+                || bonnet != Tri.UNKNOWN;
     }
 
-    /** Fields with a value, out of the eleven — a health number for diagnostics. */
+    /** Fields with a value, out of {@link #FIELDS} — a health number for diagnostics. */
     public int knownCount() {
         int n = 0;
         if (fuelPercent != UNKNOWN_INT) n++;
         if (speedKph != UNKNOWN_INT) n++;
         if (rpm != UNKNOWN_INT) n++;
         if (coolantC != UNKNOWN_INT) n++;
+        if (outsideC != UNKNOWN_INT) n++;
+        if (intakeC != UNKNOWN_INT) n++;
+        if (odometerKm != UNKNOWN_INT) n++;
         for (Tri t : new Tri[] { doorFrontLeft, doorFrontRight, doorRearLeft,
-                doorRearRight, boot, handbrake, reverse }) {
+                doorRearRight, boot, bonnet, handbrake, reverse }) {
             if (t != Tri.UNKNOWN) n++;
         }
         return n;
     }
 
-    public static final int FIELDS = 11;
+    public static final int FIELDS = 15;
 
     /** How many doors are actually standing open right now. */
     public int openDoors() {
@@ -70,6 +118,7 @@ public final class VehicleState {
         if (doorRearLeft == Tri.YES) n++;
         if (doorRearRight == Tri.YES) n++;
         if (boot == Tri.YES) n++;
+        if (bonnet == Tri.YES) n++;
         return n;
     }
 

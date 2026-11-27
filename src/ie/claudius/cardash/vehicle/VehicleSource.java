@@ -5,7 +5,7 @@ import android.content.Context;
 /**
  * A place car data comes from.
  *
- * Two implementations, deliberately kept behind one interface so the
+ * Several implementations, deliberately kept behind one interface so the
  * cheap route today doesn't have to be thrown away when a canbox goes
  * in later:
  *
@@ -14,6 +14,9 @@ import android.content.Context;
  *   JancarSource  — the head unit's own vendor car service, which is
  *                   fed by a canbox on the harness. Doors, lights,
  *                   handbrake, reverse. Does nothing if no box fitted.
+ *   HcnSource     — HCN units (com.hcn.autocan): its data service and the
+ *                   door properties it writes; Raise VW frames decoded
+ *                   by HcnParse. See docs/hcn.md.
  *
  * The status methods exist for the Diagnostics screen: "not detected",
  * "detected but silent" and "talking but unparsed" look identical on the

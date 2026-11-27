@@ -1,6 +1,9 @@
 package ie.claudius.cardash.diag;
 
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -210,6 +213,83 @@ public final class Probe {
             if (shown == 0) sb.append("(no receivers, services or providers declared)\n");
         } catch (Exception e) {
             sb.append("manifest unreadable: ").append(e).append('\n');
+        }
+        return sb.toString();
+    }
+
+    // ---- 4.2b launchable activities -------------------------------------------
+
+    /**
+     * Every activity another app may start, across all installed
+     * packages (or just {@code onlyPkg}), read from the same manifests
+     * the sweep reads. Includes the ones with no launcher icon, which
+     * are the point: factory menus, canbox setup, EngineerMode.
+     * Non-exported activities are left out; they can't be started from
+     * here anyway. Slow (one manifest parse per package): background
+     * thread only.
+     */
+    public static List<ActivityTargets.Target> exportedActivities(Context ctx, String onlyPkg) {
+        PackageManager pm = ctx.getPackageManager();
+        List<String> pkgs = new ArrayList<>();
+        if (onlyPkg != null) {
+            pkgs.add(onlyPkg);
+        } else {
+            for (PackageInfo pi : pm.getInstalledPackages(0)) {
+                if (!pi.packageName.equals(ctx.getPackageName()) && !"android".equals(pi.packageName)) {
+                    pkgs.add(pi.packageName);
+                }
+            }
+        }
+        Collections.sort(pkgs);
+        List<ActivityTargets.Target> out = new ArrayList<>();
+        for (String pkg : pkgs) {
+            try {
+                for (ManifestReader.Component c : ManifestReader.read(ctx, pkg)) {
+                    if (!"activity".equals(c.kind) && !"activity-alias".equals(c.kind)) continue;
+                    if (c.name == null) continue;
+                    boolean filtered = !c.actions.isEmpty() || !c.categories.isEmpty();
+                    if (!ActivityTargets.isExported(c.exported, filtered)) continue;
+                    out.add(new ActivityTargets.Target(pkg, c.name,
+                            ActivityTargets.isLauncher(c.actions, c.categories), c.permission));
+                }
+            } catch (Exception ignored) {
+                // unreadable APK; nothing to list
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Start an exported activity by explicit component. Returns null on
+     * success, otherwise a one-line reason to show next to the button:
+     * a missing, disabled or non-exported activity, or a permission we
+     * don't hold, must never take the Diagnostics screen down.
+     */
+    public static String launch(Context ctx, String pkg, String cls) {
+        try {
+            Intent i = new Intent();
+            i.setComponent(new ComponentName(pkg, cls));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(i);
+            return null;
+        } catch (ActivityNotFoundException e) {
+            return "Not found, disabled or not startable: " + pkg + "/" + cls;
+        } catch (SecurityException e) {
+            return "Refused: " + e.getMessage();
+        } catch (RuntimeException e) {
+            return "Failed: " + e;
+        }
+    }
+
+    /** Text form for the export and the provider: one line per activity. */
+    public static String activitiesText(List<ActivityTargets.Target> targets) {
+        if (targets.isEmpty()) return "(no exported activities)";
+        StringBuilder sb = new StringBuilder();
+        for (ActivityTargets.Target t : targets) {
+            sb.append(t.flat()).append(t.launcher ? "" : "  [no icon]");
+            if (t.permission != null) sb.append("  [needs ").append(t.permission).append(']');
+            if (t.risk != null) sb.append("  [RISKY]");
+            sb.append('\n');
         }
         return sb.toString();
     }

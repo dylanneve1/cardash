@@ -11,8 +11,10 @@ Notes for AI agents (and people) working on CarDash or bringing up a new head un
 - Be terse in reports. State what was tested on hardware and what wasn't.
 
 ## Code map
-- `src/.../HomeActivity.java`: the dash. `M3.java`: palette from wallpaper. `MaterialShape`/`Shapes`: tile shapes.
-- `src/.../vehicle/`: `VehicleHub` (shared instance) merges sources into `VehicleState`. `ObdSource` (ELM327 over Bluetooth SPP), `JancarSource` (canbox data via the Jancar vendor service; its action/extra names are partly guesses).
+- `src/.../HomeActivity.java`: the dash (data sources, edit-mode switch). The layout is data: `layout/` (Android-free, tested: `HomeLayout` pages of items, `Grid`, `Arrange` collisions, `Defaults` = the original look, `Kind` widget types and their settings, `Json`). `LayoutStore` loads/saves it, `GridPage` lays it out (and does drag/resize in edit mode), `HomePager` pages and swipe-up (default: car | home | information, `Defaults.full`; a page `theme` picks modern widgets or `ClassicCluster`), `Widgets` builds each widget and feeds it live data, `HomeEditor` is the edit toolbar (page actions, or actions on the tapped selection) and dialogs. `DoorOverlay` is the door pop-up (rules in `vehicle/DoorWatch`, tested). `M3.java`: palette from wallpaper. `MaterialShape`/`Shapes`: tile shapes.
+- `src/.../vehicle/`: `VehicleHub` (shared instance) merges sources into `VehicleState`. `ObdSource` (ELM327 over Bluetooth SPP; `ObdReply` parser and `ObdSchedule`, Android-free), `SimSource`/`SimVehicle` (simulated car), `VehicleMerge` (source priority), `JancarSource` (canbox data via the Jancar vendor service; its action/extra names are partly guesses), `HcnSource` + `HcnParse` (HCN units, com.hcn.autocan: bound-service callback, door properties, Raise VW frames; facts in `docs/hcn.md`).
+- `src/.../car/`: Android-free `Vin`, `CarProfile`, `CarGeometry` (drawn by `CarView`).
+- `src/.../bt/`: the Bluetooth search & pair screen; `BtDevices` (Android-free, tested) holds the dongle-name heuristics and picks which paired device `ObdSource` uses.
 - `src/.../diag/`: the Diagnostics screen and `DiagProvider` (shell/root-only API, see below).
 - `docs/car-integration.md`: hardware facts, the discovery method, and what each car platform is likely to expose.
 
@@ -24,12 +26,17 @@ P=content://ie.claudius.cardash.diag
 adb shell content query --uri $P/unit                      # identity, real API level, ROM family
 adb shell content query --uri $P/sweep                     # every car-ish intent action declared on the unit
 adb shell content query --uri $P/surface/<vendor.pkg>      # one vendor package's receivers/providers/services
+adb shell content query --uri $P/activities?q=engineer    # exported activities (hidden vendor menus); filter with ?q=
+adb shell content call  --uri $P --method launch --arg com.vendor.pkg/.SomeActivity   # risky ones also need --extra confirm:s:yes
 adb shell content query --uri $P/serial                    # serial ports (canbox UART is often /dev/ttyS*)
 adb shell content call  --uri $P --method sniff --arg 30   # live-capture car broadcasts for 30 s with typed extras
 adb shell content call  --uri $P --method sources --arg 5  # which vehicle sources are detected / heard
 adb shell content call  --uri $P --method obd --arg 20     # raw ELM327 replies, if a dongle is paired
+adb shell content call  --uri $P --method sim --arg "enable=1,rpm=3000,door_fl=1"   # simulated vehicle
 ```
-The Diagnostics screen (long-press the clock, or Settings) shows the same, with a plain-text export.
+On a unit with no adb at all, the Diagnostics screen's **Launch activities…** row opens a screen (grouped by app, with icons) that does the same on screen: every exported activity of every app (default: only those with no launcher icon), a filter box, and a Launch button that starts it by explicit component. Factory/engineer/modem/radio/RF/IMEI names and `com.mediatek.engineermode` ask for confirmation first. Rules live in `diag/ActivityTargets.java` (tested in `test/ActivityTargetsTest.java`).
+
+The Diagnostics screen (long-press the clock → Diagnostics, or Settings) shows the same, with a plain-text export.
 
 **Capture recipe** (do each action during a `sniff` window, note the time): ignition on → open/close each door → boot → lights on/off → reverse gear → each steering wheel button → rev the engine → drive a little (speed). Then map each action to the broadcast or extra that changed. Attach the export to a "Support my head unit or car" issue.
 
