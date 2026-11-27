@@ -28,6 +28,9 @@ public final class VehicleState {
     public int intakeC = UNKNOWN_INT;
     public int odometerKm = UNKNOWN_INT;
 
+    /** The other engine readings, mode-01 PID to metric value ({@link VehicleField}); absent is unknown. */
+    public final java.util.Map<Integer, Float> engine = new java.util.TreeMap<>();
+
     public Tri doorFrontLeft = Tri.UNKNOWN;
     public Tri doorFrontRight = Tri.UNKNOWN;
     public Tri doorRearLeft = Tri.UNKNOWN;
@@ -57,6 +60,7 @@ public final class VehicleState {
         c.outsideC = outsideC;
         c.intakeC = intakeC;
         c.odometerKm = odometerKm;
+        c.engine.putAll(engine);
         c.doorFrontLeft = doorFrontLeft;
         c.doorFrontRight = doorFrontRight;
         c.doorRearLeft = doorRearLeft;
@@ -79,6 +83,7 @@ public final class VehicleState {
                 || coolantC != UNKNOWN_INT
                 || outsideC != UNKNOWN_INT
                 || intakeC != UNKNOWN_INT
+                || !engine.isEmpty()
                 || anyDoorKnown();
     }
 

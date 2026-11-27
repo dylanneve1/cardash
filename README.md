@@ -74,7 +74,7 @@ The home screen is a grid of cells (12 × 8 on a 1280×720 unit, worked out from
 - **Move:** drag the selected widget, or nudge it with the arrow buttons (they hop over neighbours); it snaps to cells and never lands on another one.
 - **Resize:** *Resize*, then the width and height buttons or the round handle in its bottom-right corner.
 - **Settings of a widget** and **Remove** are on the same bar. Everything is 48 dp or bigger, and the grid shrinks to sit above the bar, so nothing hides under it.
-- **Add:** *Add* in the bar at the bottom (or long-press empty space): an app, clock, date, now playing, speedometer, trip, weather, a single vehicle value (coolant, fuel, rpm, speed, outside temperature) as a bar or a gauge with its own minimum, maximum and warning threshold (default coolant 0–120 °C, red from 110), the car illustration, the all-apps button, the settings button, the vehicle strip.
+- **Add:** *Add* in the bar at the bottom (or long-press empty space): an app, clock, date, now playing, speedometer, trip, weather, a value list (the car values, or all the engine data), a single vehicle value (any of those below) as a pill bar or a gauge with its own minimum, maximum and warning threshold (default coolant 0–120 °C, red from 110), the car illustration, the all-apps button, the settings button, the vehicle strip.
 - **Pages:** swipe sideways between pages. In edit mode, *+ Page* adds an empty page or a ready-made vehicle page (three gauges, doors, speed bar); *Delete page* removes one.
 - **Done** keeps the changes, **Cancel** throws them away, **Default** goes back to the original layout.
 - **All apps:** swipe up from anywhere on the home screen (or add the all-apps button).
@@ -94,23 +94,24 @@ Built for a Jancar / Rockchip RK3326 unit — Android 11, 32-bit — and kept ho
 | Data source | Hardware | Gives you |
 |---|---|---|
 | GPS | The unit's own receiver | Speed, trip distance, position for weather |
-| `ObdSource` | ELM327 Bluetooth dongle | RPM, speed, coolant; fuel level and outside (or intake) air temperature where the car has the PID; VIN |
+| `ObdSource` | ELM327 Bluetooth dongle | RPM, speed, coolant; where the car has the PID: fuel level, outside and intake air, load, throttle, fuel trims, manifold, fuel, rail and barometric pressure, timing advance, air flow, battery voltage, oil and catalyst temperature, fuel rate, accelerator, run time, distance with the check-engine light on and since codes were cleared; VIN |
 | `JancarSource` | CAN box on the harness | Doors, boot, handbrake, reverse, fuel |
 | `HcnSource` | HCN head units (`com.hcn.autocan`) | Doors, handbrake, fuel, outside temperature, odometer (see [docs/hcn.md](docs/hcn.md)) |
 | `HcnSource` | HCN head units (`com.hcn.autocan`), Raise box | Doors, boot; handbrake, RPM, fuel if the vendor service passes frames on ([docs/hcn.md](docs/hcn.md)) — untested on a car |
 
 OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where several sources report a field, the OBD dongle wins and the CAN box fills in what it lacks (fuel, for instance). When OBD reports speed, the gauge prefers it over GPS (no lag under braking, no tunnel dropout). Fuel is remembered across restarts; doors are not. A value nobody reports shows a dash, or *Unavailable* when the car says it has no such PID; engine OBD has no inside temperature at all.
 
-The OBD link is tuned for speed: supported PIDs are read once, on CAN several PIDs share one request, RPM and speed go in every cycle and slow values now and then. *Diagnostics* shows the measured requests per second.
+The OBD link is tuned for speed: supported PIDs are read once, on CAN several PIDs share one request, RPM and speed go in every cycle, coolant, fuel and outside air when due, and the rest of the engine data in the room left (on older protocols one such PID every other cycle, so a full round takes a while). *Diagnostics* shows the measured requests per second.
 
 ## Car pages
 
-A fresh install has three pages: **car information** (RPM, speed and coolant gauges over fuel, the trip meter with its average speed, and the outside temperature), the **home** page where it starts, and **useful information** (clock, now playing, weather, trip). Swipe up for apps. A layout you have saved is never replaced; *Edit → Default* gets the new one.
+A fresh install has three pages: **car information** (RPM, speed and coolant gauges over a list of fuel, outside temperature, battery voltage and the trip with its average speed), the **home** page where it starts, and **engine data** (every reading the car supports and has answered, in columns). With vehicle data switched off there is no car page and the right one shows clock, now playing, weather and trip. Swipe up for apps. A layout you have saved is never replaced; *Edit → Default* gets the new one.
 
 - **Door pop-up** — when a door, the boot or the bonnet is reported open (any source, the simulator included), a translucent card with the car and the open parts appears over CarDash's own screens (home, all apps, settings; never over other apps). It leaves 3 seconds after everything is shut; a tap dismisses it. *Settings → Door pop-up* turns it off. The car drawing can also be added as a widget (*Add → Car illustration*).
 - **Style** — the car page comes as *Modern* widgets or a monochrome *Classic VW* cluster screen (heading and time, car, outside temperature, odometer and trip). Choose per page in edit mode, or in Settings.
 - **Car profile** — make, model and body (3-door, 5-door, estate, saloon). Make and model come from the VIN; the door count doesn't, so pick it.
-- **Warnings** — a value's box turns red past its limit (5500 rpm, 110 °C coolant; each widget's gear changes it).
+- **Pill bars** — a bar value is a pill whose background fills to the value; the text stays readable over both parts. Lists stack them in one card.
+- **Warnings** — past its limit a pill's fill (or a gauge's box) turns red: 5500 rpm, 110 °C coolant, 15 % fuel, 11 V battery, any distance with the check-engine light on. A single value widget's gear changes it.
 - **Unplug reminder** — with a dongle chosen, three minutes without the engine running raises a notification and a banner, once per stop.
 
 ### Trying it without a car
@@ -125,7 +126,7 @@ adb shell content call --uri $P --method sim --arg "fuel=na"        # a value th
 adb shell content call --uri $P --method sim --arg "enable=0"
 ```
 
-Names: `rpm speed coolant fuel outside odometer door_fl door_fr door_rl door_rr boot bonnet handbrake reverse` (and `reset=1`).
+Names: `rpm speed coolant fuel outside odometer door_fl door_fr door_rl door_rr boot bonnet handbrake reverse` (and `reset=1`). The engine readings follow rpm, speed and coolant; each can be pinned or made `na`: `load throttle oiltemp intake fuelrate voltage maf map baro timing stft ltft absload pedal fuelpressure railpressure cattemp runtime mildist cleardist`.
 
 ## Phone settings
 

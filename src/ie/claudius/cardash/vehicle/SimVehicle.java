@@ -33,6 +33,8 @@ public final class SimVehicle {
     public static final SimVehicle SHARED = new SimVehicle();
 
     private final Map<String, Integer> values = new LinkedHashMap<>();
+    /** Engine readings set by hand, by field id; NaN for "na". The rest follow rpm, speed and coolant. */
+    private final Map<String, Float> engine = new LinkedHashMap<>();
     private long cycleSince = -1;
 
     public SimVehicle() {
@@ -43,6 +45,7 @@ public final class SimVehicle {
         values.clear();
         for (String[] n : NUMBERS) values.put(n[0], Integer.parseInt(n[5]));
         for (String[] s : SWITCHES) values.put(s[0], 0);
+        engine.clear();
         cycleSince = -1;
     }
 
@@ -64,6 +67,16 @@ public final class SimVehicle {
         for (Map.Entry<String, String> e : changes.entrySet()) {
             String k = e.getKey(), v = e.getValue() == null ? "" : e.getValue().trim();
             if ("reset".equals(k) || "cycle".equals(k)) continue;
+            if (!values.containsKey(k) && isEngine(k)) {
+                Float f = parseEngine(k, v);
+                if (f == null) {
+                    bad.append(k).append('=').append(v).append(' ');
+                    continue;
+                }
+                stopCycle(now);
+                engine.put(k, f);
+                continue;
+            }
             if (!values.containsKey(k)) {
                 bad.append(k).append(' ');
                 continue;
@@ -77,7 +90,13 @@ public final class SimVehicle {
             values.put(k, parsed);
         }
         String cycle = changes.get("cycle");
-        if ("1".equals(cycle)) cycleSince = now;
+        if ("1".equals(cycle)) {
+            cycleSince = now;
+            // The drive drives the engine readings too; only the "na" ones stay missing.
+            for (java.util.Iterator<Float> i = engine.values().iterator(); i.hasNext(); ) {
+                if (!i.next().isNaN()) i.remove();
+            }
+        }
         else if ("0".equals(cycle)) stopCycle(now);
         else if (cycle != null) bad.append("cycle=").append(cycle).append(' ');
         return bad.toString().trim();
@@ -112,6 +131,72 @@ public final class SimVehicle {
         return null;
     }
 
+    private static boolean isEngine(String id) {
+        return "intake".equals(id) || VehicleField.of(id) != null && VehicleField.of(id).interval > 0;
+    }
+
+    private static Float parseEngine(String id, String v) {
+        if ("na".equalsIgnoreCase(v)) return Float.NaN;
+        try {
+            float f = Float.parseFloat(v);
+            VehicleField field = VehicleField.of(id);
+            if (Float.isNaN(f)) return null;
+            int top = field.type == VehicleField.Type.DURATION || field.type == VehicleField.Type.DISTANCE
+                    ? 65535 : field.max;
+            return Math.max(field.min, Math.min(top, f));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Engine readings that go with the driving: load and air follow speed
+     * and revs, temperatures follow the coolant, an engine that is off
+     * pulls no air and the battery rests. Missing inputs count as idle.
+     *
+     * @param t seconds, for the small wobble of a live engine and the run time
+     */
+    private static Map<String, Float> engineAt(Map<String, Integer> v, float t, float pull) {
+        int rpm = known(v.get("rpm"), 850), speed = known(v.get("speed"), 0);
+        int coolant = known(v.get("coolant"), 90), outside = known(v.get("outside"), 8);
+        boolean on = rpm > 0;
+        float revs = Math.min(1f, rpm / 6500f);
+        float wobble = (float) Math.sin(t * 2.1);
+        float load = on ? clamp(18f + 45f * revs + 0.15f * speed + 30f * pull + 2f * wobble, 0, 100) : 0;
+        float throttle = on ? clamp(12f + 35f * revs + 45f * pull + wobble, 0, 100) : 12;
+        float maf = on ? clamp(rpm * (0.0012f + 0.00028f * load), 0, 200) : 0;
+        Map<String, Float> m = new LinkedHashMap<>();
+        m.put("load", load);
+        m.put("throttle", throttle);
+        m.put("oiltemp", clamp(coolant - 6f, -30, 150));
+        m.put("intake", outside + (on ? 12f - Math.min(8f, speed / 12f) : 4f));
+        m.put("fuelrate", on ? maf * 0.33f : 0);                       // petrol, stoichiometric
+        m.put("voltage", on ? 14.1f + 0.1f * wobble : 12.4f);
+        m.put("maf", maf);
+        m.put("map", on ? clamp(28f + 0.72f * load, 0, 101) : 101);
+        m.put("baro", 101f);
+        m.put("timing", on ? clamp(8f + 28f * revs - 10f * pull + wobble, -20, 60) : 0);
+        m.put("stft", on ? 2.3f * wobble : 0);
+        m.put("ltft", -1.6f);
+        m.put("absload", load * 0.8f);
+        m.put("pedal", on ? clamp(throttle - 12f, 0, 100) : 0);
+        m.put("fuelpressure", on ? 380f : 0);
+        m.put("railpressure", on ? clamp(40f + 110f * load / 100f, 0, 250) : 0);
+        m.put("cattemp", on ? clamp(300f + 4f * load + 0.8f * coolant, 0, 1000) : coolant);
+        m.put("runtime", on ? 600f + t : 0);
+        m.put("mildist", 0f);
+        m.put("cleardist", 1840f);
+        return m;
+    }
+
+    private static int known(Integer v, int otherwise) {
+        return v == null || v == VehicleState.UNKNOWN_INT ? otherwise : v;
+    }
+
+    private static float clamp(float v, float lo, float hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
+    }
+
     private void stopCycle(long now) {
         if (cycleSince < 0) return;
         values.putAll(cycleAt(now - cycleSince, values));
@@ -126,7 +211,7 @@ public final class SimVehicle {
     }
 
     /** What the pretend car reports, as a vehicle state. */
-    public VehicleState state(long now) {
+    public synchronized VehicleState state(long now) {
         Map<String, Integer> v = values(now);
         VehicleState s = new VehicleState();
         s.rpm = v.get("rpm");
@@ -136,6 +221,20 @@ public final class SimVehicle {
         s.fuelUnsupported = s.fuelPercent == VehicleState.UNKNOWN_INT;
         s.outsideC = v.get("outside");
         s.odometerKm = v.get("odometer");
+        float t = cycleSince >= 0 ? (now - cycleSince) / 1000f : 0f;
+        // How hard the drive cycle is accelerating, 0 to 1.
+        float pull = 0f;
+        if (cycleSince >= 0) {
+            int ahead = cycleAt(now - cycleSince + 1000, values).get("speed");
+            pull = clamp((ahead - v.get("speed")) / 8f, 0, 1);
+        }
+        Map<String, Float> eng = engineAt(v, t, pull);
+        eng.putAll(engine);
+        for (Map.Entry<String, Float> e : eng.entrySet()) {
+            if (e.getValue().isNaN()) continue;
+            if ("intake".equals(e.getKey())) s.intakeC = Math.round(e.getValue());
+            else s.engine.put(VehicleField.of(e.getKey()).pid, e.getValue());
+        }
         s.doorFrontLeft = tri(v.get("door_fl"));
         s.doorFrontRight = tri(v.get("door_fr"));
         s.doorRearLeft = tri(v.get("door_rl"));

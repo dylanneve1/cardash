@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plain-JVM tests for the Android-free parts (ELM327 parsing, VIN and car profile, car drawing, unplug reminder, simulator, door pop-up, HCN/Raise frames, phone settings page, QR code, exported-activity launcher, clock fit, home layout model, Bluetooth device list).
+# Plain-JVM tests for the Android-free parts (ELM327 parsing, PID decoding, pill bars, VIN and car profile, car drawing, unplug reminder, simulator, door pop-up, HCN/Raise frames, phone settings page, QR code, exported-activity launcher, clock fit, home layout model, Bluetooth device list).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/build/test"
@@ -11,6 +11,9 @@ javac -d "$OUT" \
   "$HERE/src/ie/claudius/cardash/vehicle/ObdSchedule.java" \
   "$HERE/src/ie/claudius/cardash/vehicle/RateMeter.java" \
   "$HERE/test/ObdReplyTest.java" \
+  "$HERE/src/ie/claudius/cardash/vehicle/VehicleField.java" \
+  "$HERE/test/VehicleFieldTest.java" \
+  "$HERE/test/PillTest.java" \
   "$HERE/src/ie/claudius/cardash/vehicle/VehicleState.java" \
   "$HERE/src/ie/claudius/cardash/vehicle/VehicleMerge.java" \
   "$HERE"/src/ie/claudius/cardash/car/*.java \
@@ -41,6 +44,8 @@ javac -d "$OUT" \
   "$HERE/test/ExportTextTest.java"
 java -cp "$OUT" ObdParseTest
 java -cp "$OUT" ObdReplyTest
+java -cp "$OUT" VehicleFieldTest
+java -cp "$OUT" PillTest
 java -cp "$OUT" CarProfileTest
 java -cp "$OUT" CarGeometryTest
 java -cp "$OUT" UnplugReminderTest

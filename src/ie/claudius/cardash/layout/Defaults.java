@@ -77,35 +77,48 @@ public final class Defaults {
 
     /**
      * The layout a fresh install gets: car information on the left, the
-     * home page in the middle (where it starts), useful information on
-     * the right. With vehicle data switched off there is no car page.
+     * home page in the middle (where it starts), engine data on the
+     * right. With vehicle data switched off there is no car page, and the
+     * right page holds clock, now playing, weather and trip instead.
      */
     public static HomeLayout full(Options o, int cols, int rows) {
         HomeLayout l = home(o, cols, rows);
         if (o.vehicle) l.insertPage(0, carPage(cols, rows));
-        l.pages.add(infoPage(cols, rows));
+        l.pages.add(o.vehicle ? enginePage(cols, rows) : infoPage(cols, rows));
         return l;
     }
 
     /**
-     * Car information: RPM, speed and coolant gauges over fuel, the trip
-     * meter (distance, time and average speed) and the outside temperature.
-     * The car drawing is not here: it pops up when a door opens, and can be
-     * added as a widget.
+     * Car information: RPM, speed and coolant gauges over a list of fuel,
+     * outside temperature, battery voltage and the trip. The car drawing
+     * is not here: it pops up when a door opens, and can be added as a
+     * widget.
      */
     public static HomeLayout.Page carPage(int cols, int rows) {
         HomeLayout t = new HomeLayout(TC, TR);
         HomeLayout.Page p = new HomeLayout.Page();
         t.pages.add(p);
         p.theme = HomeLayout.AUTO;
-        p.items.add(vehicle("rpm", "gauge", 0, 0, 4, 4));
-        p.items.add(vehicle("speed", "gauge", 4, 0, 4, 4));
-        p.items.add(vehicle("coolant", "gauge", 8, 0, 4, 4));
-        p.items.add(vehicle("fuel", "bar", 0, 4, 4, 4));
-        p.items.add(new HomeLayout.Item(Kind.TRIP, 4, 4, 4, 4));
-        p.items.add(vehicle("outside", "bar", 8, 4, 4, 4));
+        p.items.add(vehicle("rpm", "gauge", 0, 0, 4, 5));
+        p.items.add(vehicle("speed", "gauge", 4, 0, 4, 5));
+        p.items.add(vehicle("coolant", "gauge", 8, 0, 4, 5));
+        p.items.add(list(Kind.LIST_CAR, 0, 5, 12, 3));
         t.rescale(cols, rows);
         return t.pages.get(0);
+    }
+
+    /** Everything the engine reports, as one list over the whole page. */
+    public static HomeLayout.Page enginePage(int cols, int rows) {
+        HomeLayout t = new HomeLayout(TC, TR);
+        HomeLayout.Page p = new HomeLayout.Page();
+        t.pages.add(p);
+        p.items.add(list(Kind.LIST_ENGINE, 0, 0, TC, TR));
+        t.rescale(cols, rows);
+        return t.pages.get(0);
+    }
+
+    private static HomeLayout.Item list(String set, int x, int y, int w, int h) {
+        return new HomeLayout.Item(Kind.LIST, x, y, w, h).set("set", set);
     }
 
     /** Clock and date, now playing, weather and the trip meter. */

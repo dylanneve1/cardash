@@ -7,6 +7,7 @@ import ie.claudius.cardash.layout.Grid;
 import ie.claudius.cardash.layout.HomeLayout;
 import ie.claudius.cardash.layout.Json;
 import ie.claudius.cardash.layout.Kind;
+import ie.claudius.cardash.vehicle.VehicleField;
 
 public class HomeLayoutTest {
     static int fails = 0;
@@ -79,7 +80,9 @@ public class HomeLayoutTest {
                     check(x.pages.get(0).items.size() >= 3, "default not gutted on " + c + "x" + rw);
                 }
                 check(Arrange.valid(wrap(Defaults.carPage(c, rw), c, rw)), "car page valid on " + c + "x" + rw);
-                check(Defaults.carPage(c, rw).items.size() == 6, "car page complete on " + c + "x" + rw);
+                check(Defaults.carPage(c, rw).items.size() == 4, "car page complete on " + c + "x" + rw);
+                check(Arrange.valid(wrap(Defaults.enginePage(c, rw), c, rw))
+                        && Defaults.enginePage(c, rw).items.size() == 1, "engine page on " + c + "x" + rw);
                 HomeLayout full = Defaults.full(classic(), c, rw);
                 check(Arrange.valid(full) && full.pages.size() == 3 && full.start == 1
                         && Defaults.infoPage(c, rw).items.size() == 5, "full default on " + c + "x" + rw);
@@ -100,8 +103,9 @@ public class HomeLayoutTest {
 
         // ---- default pages: car | home | information
         HomeLayout three = Defaults.full(classic(), 12, 8);
-        check(count(wrap(three.pages.get(0), 12, 8), Kind.VEHICLE) == 5
-                && count(wrap(three.pages.get(0), 12, 8), Kind.TRIP) == 1, "left page is the car");
+        check(count(wrap(three.pages.get(0), 12, 8), Kind.VEHICLE) == 3
+                && count(wrap(three.pages.get(0), 12, 8), Kind.LIST) == 1
+                && "car".equals(three.pages.get(0).items.get(3).get("set", "")), "left page is the car");
         check(!three.hasItem(Kind.DOORS), "no car widget by default");
         check(Kind.of(Kind.DOORS) != null && Arrange.place(wrap(new HomeLayout.Page(), 12, 8),
                 new HomeLayout.Page(), Kind.of(Kind.DOORS)) != null, "the car widget can still be added");
@@ -110,9 +114,15 @@ public class HomeLayoutTest {
         old.pages.get(0).items.add(new HomeLayout.Item(Kind.DOORS, 4, 0, 4, 8));
         check(HomeLayout.fromJson(old.toJson()).hasItem(Kind.DOORS), "a saved car widget is kept");
         check(wrap(three.pages.get(1), 12, 8).toJson().equals(d.toJson()), "centre page is the old home");
-        check(count(wrap(three.pages.get(2), 12, 8), Kind.TRIP) == 1, "right page has the trip");
+        HomeLayout.Item engine = three.pages.get(2).items.get(0);
+        check(three.pages.get(2).items.size() == 1 && Kind.LIST.equals(engine.type)
+                && "engine".equals(engine.get("set", "")) && engine.w == 12 && engine.h == 8,
+                "right page is the engine data");
+        check(!three.pages.get(2).isCarPage(), "the car page style leaves engine data alone");
         HomeLayout noCar = Defaults.full(minimal, 12, 8);
         check(noCar.pages.size() == 2 && noCar.start == 0, "no car page with vehicle data off");
+        check(count(noCar, Kind.LIST) == 0 && noCar.pages.get(1).items.size() == 5,
+                "nor an engine page: information instead");
         check(HomeLayout.fromJson(three.toJson()).start == 1 && three.copy().start == 1, "start page persists");
         check(HomeLayout.fromJson(d.toJson().replace("\"start\":0", "\"start\":9")).start == 0, "start clamped");
         check(HomeLayout.fromJson("{\"cols\":12,\"rows\":8,\"pages\":[{},{}]}").start == 0,
@@ -241,6 +251,14 @@ public class HomeLayoutTest {
                 && !Kind.warningHeld(true, 5300, 5500, "above", 0, 8000), "holds, then clears");
         check(Kind.warningHeld(true, 16, 15, "below", 0, 100) && !Kind.warningHeld(true, 18, 15, "below", 0, 100),
                 "hysteresis below");
+
+        // Every vehicle value is selectable, and "never" never warns.
+        check(Kind.of(Kind.VEHICLE).option("field").choices.length == VehicleField.all().size(), "all values selectable");
+        for (VehicleField vf : VehicleField.all()) {
+            check(vf.id.equals(Kind.vehicleDefaults(vf.id).get("field")) && vf.max > vf.min, "defaults for " + vf.id);
+        }
+        check(!Kind.warning(200, 100, "never") && !Kind.warningHeld(true, 99, 100, "never", 0, 100), "never warns");
+        check("coolant".equals(Kind.field("warp").id), "an unknown field falls back to coolant");
 
         if (fails == 0) System.out.println("HomeLayoutTest: ok");
         else { System.out.println("HomeLayoutTest: " + fails + " failure(s)"); System.exit(1); }

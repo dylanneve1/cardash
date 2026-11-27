@@ -91,6 +91,12 @@ public final class LayoutStore {
         return p;
     }
 
+    /** A fresh engine data page sized for this screen. */
+    public static HomeLayout.Page enginePage(Context ctx) {
+        int[] g = gridFor(ctx);
+        return Defaults.enginePage(g[0], g[1]);
+    }
+
     /**
      * The car page style chosen in Settings: car pages of a saved layout
      * go back to following it.

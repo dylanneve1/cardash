@@ -174,7 +174,12 @@
     <string name="edit_page_add">+ Page</string>
     <string name="edit_page_remove">Delete page</string>
     <string name="edit_page_empty">Empty page</string>
-    <string name="edit_page_vehicle">Car page (gauges, fuel, trip, temperature)</string>
+    <string name="edit_page_vehicle">Car page (gauges, fuel, temperature, trip)</string>
+    <string name="edit_page_engine">Engine data page</string>
+    <string name="edit_add_values">Single vehicle values</string>
+    <string name="engine_data">Engine data</string>
+    <string name="engine_waiting">Waiting for engine data</string>
+    <string name="car_list">Car values list</string>
     <string name="edit_page_remove_q">Delete this page and everything on it?</string>
     <string name="edit_page_clear_q">This is the only page. Clear everything on it?</string>
     <string name="edit_page_clear">Clear</string>

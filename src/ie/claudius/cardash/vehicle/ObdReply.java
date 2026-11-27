@@ -20,12 +20,9 @@ public final class ObdReply {
 
     /** Data bytes a mode-01 PID returns, for the PIDs CarDash asks; -1 for any other. */
     public static int length(int pid) {
-        switch (pid) {
-            case 0x00: case 0x20: case 0x40: case 0x60: return 4;
-            case 0x0C: return 2;
-            case 0x05: case 0x0D: case 0x0F: case 0x2F: case 0x46: return 1;
-            default: return -1;
-        }
+        if (pid == 0x00 || pid == 0x20 || pid == 0x40 || pid == 0x60) return 4;
+        VehicleField f = VehicleField.byPid(pid);
+        return f == null ? -1 : f.bytes;
     }
 
     /** The request for up to six mode-01 PIDs, e.g. "010C0D05". */

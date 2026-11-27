@@ -47,13 +47,11 @@ import ie.claudius.cardash.car.Vin;
  * clone dongle misbehaving" — a question that otherwise costs an
  * afternoon.
  *
- * PIDs polled:
- *   0C  engine RPM          ((A*256)+B)/4
- *   0D  vehicle speed       A km/h
- *   05  coolant temp        A-40 °C
- *   2F  fuel level          A*100/255 %   (optional; many cars lack it)
- *   46  outside air temp    A-40 °C       (optional)
- *   0F  intake air temp     A-40 °C       (only when 46 is missing)
+ * PIDs polled (formulas in {@link VehicleField}): RPM and speed every
+ * cycle; coolant, fuel level and outside (or intake) air now and then;
+ * and, only where the car's bitmaps list them, the rest of the engine
+ * data (load, trims, pressures, voltage, oil temperature and so on) in
+ * whatever room is left.
  *
  * Engine OBD has no inside temperature.
  */
@@ -385,23 +383,26 @@ public final class ObdSource implements VehicleSource {
 
     private void apply(int pid, int[] b, long now) {
         seen.put(pid, now);
+        int v = Math.round(VehicleField.decode(pid, b));
         switch (pid) {
             case ObdSchedule.RPM: state.rpm = ((b[0] * 256) + b[1]) / 4; break;
-            case ObdSchedule.SPEED: state.speedKph = b[0]; break;
-            case ObdSchedule.COOLANT: state.coolantC = b[0] - 40; break;
-            case ObdSchedule.FUEL: state.fuelPercent = (int) Math.round(b[0] * 100.0 / 255.0); break;
-            case ObdSchedule.AMBIENT: state.outsideC = b[0] - 40; break;
-            case ObdSchedule.INTAKE: state.intakeC = b[0] - 40; break;
-            default: break;
+            case ObdSchedule.SPEED: state.speedKph = v; break;
+            case ObdSchedule.COOLANT: state.coolantC = v; break;
+            case ObdSchedule.FUEL: state.fuelPercent = v; break;
+            case ObdSchedule.AMBIENT: state.outsideC = v; break;
+            case ObdSchedule.INTAKE: state.intakeC = v; break;
+            default: state.engine.put(pid, VehicleField.decode(pid, b)); break;
         }
     }
 
     /** One missed reply keeps the last value; several in a row make it unknown again. */
     private void expire(long now) {
+        ObdSchedule sch = schedule;
         Iterator<Map.Entry<Integer, Long>> it = seen.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<Integer, Long> e = it.next();
-            if (now - e.getValue() > ObdSchedule.staleAfter(e.getKey())) {
+            long keep = sch != null ? sch.staleFor(e.getKey()) : ObdSchedule.staleAfter(e.getKey());
+            if (now - e.getValue() > keep) {
                 clear(e.getKey());
                 it.remove();
             }
@@ -416,7 +417,7 @@ public final class ObdSource implements VehicleSource {
             case ObdSchedule.FUEL: state.fuelPercent = VehicleState.UNKNOWN_INT; break;
             case ObdSchedule.AMBIENT: state.outsideC = VehicleState.UNKNOWN_INT; break;
             case ObdSchedule.INTAKE: state.intakeC = VehicleState.UNKNOWN_INT; break;
-            default: break;
+            default: state.engine.remove(pid); break;
         }
     }
 

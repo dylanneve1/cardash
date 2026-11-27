@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import ie.claudius.cardash.vehicle.VehicleField;
+
 /**
  * The kinds of thing that can sit on a home page, with their grid sizes
  * and the per-item settings each one understands. Android-free: the
@@ -14,7 +16,10 @@ public final class Kind {
     public static final String APP = "app", CLOCK = "clock", DATE = "date",
             NOWPLAYING = "nowplaying", SPEEDO = "speedo", TRIP = "trip",
             WEATHER = "weather", VEHICLE = "vehicle", DOORS = "doors",
-            ALLAPPS = "allapps", SETTINGS = "settings", CHIPS = "chips";
+            ALLAPPS = "allapps", SETTINGS = "settings", CHIPS = "chips", LIST = "list";
+
+    /** What a value list holds. */
+    public static final String LIST_CAR = "car", LIST_ENGINE = "engine";
 
     /** One editable setting of an item. CHOICE has {@code choices}; otherwise it is an integer. */
     public static final class Option {
@@ -48,7 +53,12 @@ public final class Kind {
         this.options = Collections.unmodifiableList(l);
     }
 
-    private static final String[] VFIELDS = { "coolant", "fuel", "rpm", "speed", "outside" };
+    private static String[] fieldIds() {
+        List<VehicleField> all = VehicleField.all();
+        String[] ids = new String[all.size()];
+        for (int i = 0; i < ids.length; i++) ids[i] = all.get(i).id;
+        return ids;
+    }
 
     private static final List<Kind> ALL;
     static {
@@ -67,12 +77,14 @@ public final class Kind {
         k.add(new Kind(TRIP, "Trip meter", 2, 1, 4, 2));
         k.add(new Kind(WEATHER, "Weather", 2, 1, 4, 2));
         k.add(new Kind(VEHICLE, "Vehicle data", 2, 1, 4, 2,
-                new Option("field", "Value", "coolant", VFIELDS),
+                new Option("field", "Value", "coolant", fieldIds()),
                 new Option("style", "Style", "bar", "bar", "gauge"),
                 new Option("min", "Minimum", 0, -1000, 100000, 10),
                 new Option("max", "Maximum", 120, -1000, 100000, 10),
                 new Option("warn", "Warning at", 110, -1000, 100000, 5),
-                new Option("warndir", "Warn when", "above", "above", "below")));
+                new Option("warndir", "Warn when", "above", "above", "below", "never")));
+        k.add(new Kind(LIST, "Value list", 2, 1, 4, 4,
+                new Option("set", "Values", LIST_CAR, LIST_CAR, LIST_ENGINE)));
         k.add(new Kind(DOORS, "Car illustration", 2, 2, 3, 4));
         k.add(new Kind(ALLAPPS, "All apps button", 2, 1, 3, 1));
         k.add(new Kind(SETTINGS, "Settings button", 1, 1, 1, 1));
@@ -101,32 +113,24 @@ public final class Kind {
 
     // ---- vehicle data -----------------------------------------------------------
 
-    /** {min, max, warn} for a vehicle field, and whether the warning is for low values. */
+    /** The field a vehicle item shows; coolant for one this version doesn't know. */
+    public static VehicleField field(String id) {
+        VehicleField f = VehicleField.of(id);
+        return f != null ? f : VehicleField.of("coolant");
+    }
+
+    /** {min, max, warn} for a vehicle field. */
     public static int[] vehicleRange(String field) {
-        if ("fuel".equals(field)) return new int[] { 0, 100, 15 };
-        if ("rpm".equals(field)) return new int[] { 0, 8000, 5500 };
-        if ("speed".equals(field)) return new int[] { 0, 220, 130 };
-        if ("outside".equals(field)) return new int[] { -20, 50, 40 };
-        return new int[] { 0, 120, 110 }; // coolant
+        VehicleField f = field(field);
+        return new int[] { f.min, f.max, f.warn };
     }
 
     public static String vehicleWarnDir(String field) {
-        return "fuel".equals(field) ? "below" : "above";
-    }
-
-    public static String vehicleUnit(String field) {
-        if ("fuel".equals(field)) return "%";
-        if ("rpm".equals(field)) return " rpm";
-        if ("speed".equals(field)) return " km/h";
-        return "°C";
+        return field(field).warnDir;
     }
 
     public static String vehicleLabel(String field) {
-        if ("fuel".equals(field)) return "Fuel";
-        if ("rpm".equals(field)) return "RPM";
-        if ("speed".equals(field)) return "Speed";
-        if ("outside".equals(field)) return "Outside";
-        return "Coolant";
+        return field(field).label;
     }
 
     /** Settings for a vehicle item showing {@code field}, with that field's usual range and warning. */
@@ -154,8 +158,7 @@ public final class Kind {
 
     /** The stepper increment for a vehicle field's minimum, maximum and warning. */
     public static int vehicleStep(String field) {
-        if ("rpm".equals(field)) return 250;
-        return 5;
+        return field(field).step;
     }
 
     /**
@@ -165,12 +168,14 @@ public final class Kind {
      */
     public static boolean warningHeld(boolean was, float value, float warn, String dir, float min, float max) {
         if (warning(value, warn, dir)) return true;
+        if ("never".equals(dir)) return false;
         float slack = Math.max(0f, (max - min) * 0.02f);
         return was && warning(value, "below".equals(dir) ? warn + slack : warn - slack, dir);
     }
 
     /** True when {@code value} is past the warning threshold in the configured direction. */
     public static boolean warning(float value, float warn, String dir) {
+        if ("never".equals(dir)) return false;
         return "below".equals(dir) ? value <= warn : value >= warn;
     }
 }

@@ -25,6 +25,7 @@ import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.layout.HomeLayout.Item;
 import ie.claudius.cardash.layout.Kind;
 import ie.claudius.cardash.media.NowPlaying;
+import ie.claudius.cardash.vehicle.VehicleField;
 import ie.claudius.cardash.vehicle.VehicleState;
 
 /**
@@ -111,7 +112,8 @@ final class Widgets {
             case Kind.DATE: v = date(it, w, h); break;
             case Kind.NOWPLAYING: v = nowPlaying(it, w, h); break;
             case Kind.SPEEDO: v = speedo(it); break;
-            case Kind.TRIP: v = trip(w, h); break;
+            case Kind.TRIP: v = trip(); break;
+            case Kind.LIST: v = list(it); break;
             case Kind.WEATHER: v = weather(w, h); break;
             case Kind.VEHICLE: v = vehicle(it); break;
             case Kind.DOORS: v = car(); break;
@@ -418,43 +420,46 @@ final class Widgets {
         return wx;
     }
 
-    /** Trip meter: distance, moving time, moving average. Tap to reset (after asking). */
-    private View trip(int w, int h) {
-        final boolean tall = h >= dp(190);
-        LinearLayout card = new LinearLayout(ctx);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER);
-        card.setBackground(Shapes.tile(d, m3.tertiaryContainer(), M3.withAlpha(m3.onTertiaryContainer(), 0x33), 0));
-        int p = dp(14);
-        card.setPadding(p, p, p, p);
-        card.setClickable(true);
-        Shapes.springy(card);
+    /**
+     * Trip meter: distance, moving time, moving average, as a pill like the
+     * other values: a row when short, stacked when taller. Tap to reset
+     * (after asking).
+     */
+    private View trip() {
+        ValueView v = pill(m3.surfaceContainer());
+        tripPill(v);
+        return v;
+    }
 
-        TextView title = new TextView(ctx);
-        title.setText(R.string.trip);
-        title.setTypeface(Fonts.display(ctx));
-        title.setTextColor(M3.withAlpha(m3.onTertiaryContainer(), 0xB3));
-        title.setTextSize(tall ? 16 : 13);
-        card.addView(title);
+    /** {distance, its unit, time and moving average}, or null with no trip meter. */
+    private String[] tripText() {
+        Trip tr = host.trip();
+        if (tr == null) return null;
+        boolean miles = Prefs.mph(ctx);
+        float m = tr.metres();
+        long ms = tr.movingMs();
+        int avg = Trip.average(m, ms, miles);
+        String text = Trip.duration(ms);
+        if (avg >= 0) text += " · " + avg + (miles ? " mph " : " km/h ") + ctx.getString(R.string.trip_avg);
+        return new String[] { Trip.distance(m, miles), miles ? "mi" : "km", text };
+    }
 
-        final TextView dist = new TextView(ctx);
-        dist.setTypeface(tall ? Fonts.hero(ctx) : Fonts.display(ctx));
-        dist.setTextColor(m3.onTertiaryContainer());
-        dist.setTextSize(tall ? 64 : 30);
-        dist.setIncludeFontPadding(false);
-        dist.setPadding(0, dp(tall ? 8 : 2), 0, 0);
-        card.addView(dist);
+    private void tripPill(final ValueView v) {
+        v.configure(ctx.getString(R.string.trip), "", false, false, 0, 0, 0, "never");
+        resetOnTap(v);
+        add(new Live(TRIP) {
+            @Override void refresh() {
+                String[] t = tripText();
+                if (t != null) v.setInfo(t[0], t[1], t[2]);
+            }
+        }).refresh();
+    }
 
-        final TextView detail = new TextView(ctx);
-        detail.setTypeface(Fonts.body(ctx));
-        detail.setTextColor(M3.withAlpha(m3.onTertiaryContainer(), 0xCC));
-        detail.setTextSize(tall ? 18 : 14);
-        detail.setPadding(0, dp(tall ? 8 : 4), 0, 0);
-        card.addView(detail);
-
-        // Long-press now means "edit the home screen" like everywhere else,
-        // so a reset is a tap and a confirmation.
-        card.setOnClickListener(new View.OnClickListener() {
+    /** Long-press means "edit the home screen" like everywhere else, so a reset is a tap and a confirmation. */
+    private void resetOnTap(View v) {
+        v.setClickable(true);
+        Shapes.springy(v);
+        v.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(final View v) {
                 Pop.confirm(ctx, m3, ctx.getString(R.string.trip_reset_q), ctx.getString(R.string.s_reset_action),
@@ -466,72 +471,115 @@ final class Widgets {
                         });
             }
         });
-        add(new Live(TRIP) {
-            @Override void refresh() {
-                Trip tr = host.trip();
-                if (tr == null) return;
-                boolean miles = Prefs.mph(ctx);
-                float m = tr.metres();
-                long ms = tr.movingMs();
-                Motion.setText(dist, Trip.distance(m, miles) + (miles ? " mi" : " km"));
-                int avg = Trip.average(m, ms, miles);
-                String text = Trip.duration(ms);
-                if (avg >= 0) text += " · " + avg + (miles ? " mph " : " km/h ") + ctx.getString(R.string.trip_avg);
-                Motion.setText(detail, text);
-            }
-        }).refresh();
-        return card;
     }
 
     // ---- vehicle ------------------------------------------------------------------
 
+    /** A pill in this palette on a track of colour {@code track}. */
+    private ValueView pill(int track) {
+        ValueView v = new ValueView(ctx);
+        v.setPillColors(track, m3.primaryContainer(), m3.errorContainer(), m3.onSurface(), m3.onSurfaceVariant(),
+                m3.onPrimaryContainer(), m3.onErrorContainer());
+        return v;
+    }
+
     private View vehicle(final Item it) {
-        final String field = it.get("field", "coolant");
-        int[] def = Kind.vehicleRange(field);
-        final ValueView v = new ValueView(ctx, M3.withAlpha(m3.onSurface(), 0x26), m3.primary(),
-                m3.onSurface(), m3.onSurfaceVariant());
-        v.setBoxes(Shapes.round(d, m3.surfaceContainer(), 28), Shapes.round(d, m3.errorContainer(), 28),
+        final VehicleField field = Kind.field(it.get("field", "coolant"));
+        boolean gauge = "gauge".equals(it.get("style", "bar"));
+        final ValueView v = pill(m3.surfaceContainer());
+        v.setGaugeColors(M3.withAlpha(m3.onSurface(), 0x26), m3.primary(), m3.onSurface(), m3.onSurfaceVariant(),
+                Shapes.round(d, m3.surfaceContainer(), 28), Shapes.round(d, m3.errorContainer(), 28),
                 m3.error(), m3.onErrorContainer());
-        v.configure(Kind.vehicleLabel(field), Kind.vehicleUnit(field), "gauge".equals(it.get("style", "bar")),
-                it.getInt("min", def[0]), it.getInt("max", def[1]), it.getInt("warn", def[2]),
-                it.get("warndir", Kind.vehicleWarnDir(field)));
-        final boolean outside = "outside".equals(field);
-        final boolean f = outside && Prefs.fahrenheit(ctx);
-        if (f) {
-            v.configure(Kind.vehicleLabel(field), "°F", "gauge".equals(it.get("style", "bar")),
-                    toF(it.getInt("min", def[0])), toF(it.getInt("max", def[1])), toF(it.getInt("warn", def[2])),
-                    it.get("warndir", Kind.vehicleWarnDir(field)));
-        }
+        configure(v, field, gauge, it.getInt("min", field.min), it.getInt("max", field.max),
+                it.getInt("warn", field.warn), it.get("warndir", field.warnDir));
         add(new Live(VEH) {
-            @Override void refresh() {
-                VehicleState s = lastVehicle;
-                int val = VehicleState.UNKNOWN_INT;
-                String note = null;
-                if (s != null) {
-                    if ("fuel".equals(field)) {
-                        val = s.fuelPercent;
-                        if (s.fuelUnsupported) note = ctx.getString(R.string.unavailable);
-                    } else if ("rpm".equals(field)) val = s.rpm;
-                    else if ("speed".equals(field)) val = s.speedKph;
-                    else if (outside) val = s.outsideC;
-                    else val = s.coolantC;
-                }
-                if (outside) {
-                    // Intake air stands in only when nothing reports outside air, and says so.
-                    boolean intake = val == VehicleState.UNKNOWN_INT && s != null
-                            && s.intakeC != VehicleState.UNKNOWN_INT;
-                    if (intake) val = s.intakeC;
-                    v.setLabel(ctx.getString(intake ? R.string.intake_label : R.string.outside_label));
-                }
-                boolean known = val != VehicleState.UNKNOWN_INT;
-                v.setValue(known, known && f ? toF(val) : val, note);
-            }
+            @Override void refresh() { feed(v, field, true); }
         }).refresh();
         return v;
     }
 
-    private static int toF(int c) {
-        return Math.round(c * 9f / 5f + 32f);
+    /** Range and warning are given in metric, as stored; the pill gets them in the units shown. */
+    private void configure(ValueView v, VehicleField f, boolean gauge, int min, int max, int warn, String dir) {
+        boolean fahr = Prefs.fahrenheit(ctx), miles = Prefs.mph(ctx);
+        String unit = f.unit(fahr, miles);
+        v.configure(f.label(miles), unit, gauge, f.bar, f.convert(min, fahr, miles), f.convert(max, fahr, miles),
+                f.convert(warn, fahr, miles), dir);
+    }
+
+    /**
+     * Give a pill or gauge the latest reading of its field; false while there is none.
+     *
+     * @param intakeStandsIn an unknown outside temperature may show the intake air instead
+     */
+    private boolean feed(ValueView v, VehicleField field, boolean intakeStandsIn) {
+        VehicleState s = lastVehicle;
+        boolean miles = Prefs.mph(ctx);
+        Float val = field.value(s);
+        String note = s != null && "fuel".equals(field.id) && s.fuelUnsupported
+                ? ctx.getString(R.string.unavailable) : null;
+        if (intakeStandsIn && "outside".equals(field.id)) {
+            // Intake air stands in only when nothing reports outside air, and says so.
+            boolean intake = val == null && s != null && s.intakeC != VehicleState.UNKNOWN_INT;
+            if (intake) val = Float.valueOf(s.intakeC);
+            v.setLabel(ctx.getString(intake ? R.string.intake_label : R.string.outside_label));
+        }
+        if (val == null) {
+            v.setValue(false, 0f, "", note);
+            return false;
+        }
+        float shown = field.convert(val, Prefs.fahrenheit(ctx), miles);
+        v.setValue(true, shown, field.format(shown), note);
+        return true;
+    }
+
+    /**
+     * Several values as pills in one card: the car page's fuel, outside
+     * temperature, battery and trip, or everything the engine reports.
+     * Fuel and outside temperature are always there; the rest appear
+     * once the car has given a value.
+     */
+    private View list(Item it) {
+        final boolean engine = Kind.LIST_ENGINE.equals(it.get("set", Kind.LIST_CAR));
+        final ValueList card = new ValueList(ctx, m3, engine,
+                ctx.getString(R.string.engine_data), ctx.getString(R.string.engine_waiting));
+        final List<VehicleField> fields = new ArrayList<>();
+        final List<ValueView> pills = new ArrayList<>();
+        if (engine) {
+            fields.addAll(VehicleField.all());
+        } else {
+            for (String id : new String[] { "fuel", "outside", "voltage" }) fields.add(VehicleField.of(id));
+        }
+        for (VehicleField f : fields) {
+            ValueView v = pill(m3.surfaceContainerHigh());
+            configure(v, f, false, f.min, f.max, f.warn, f.warnDir);
+            if (engine || "voltage".equals(f.id)) v.setVisibility(View.GONE);
+            pills.add(v);
+            card.add(v);
+        }
+        add(new Live(VEH) {
+            @Override void refresh() {
+                for (int i = 0; i < pills.size(); i++) {
+                    VehicleField f = fields.get(i);
+                    // The engine list has the intake air in its own row.
+                    boolean known = feed(pills.get(i), f, !engine);
+                    if (engine || "voltage".equals(f.id)) card.show(pills.get(i), known);
+                }
+            }
+        }).refresh();
+        if (!engine) {
+            ValueView t = pill(m3.surfaceContainerHigh());
+            card.add(t);
+            tripPill(t);
+            t.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View view) {
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                    host.enterEdit();
+                    return true;
+                }
+            });
+        }
+        return card;
     }
 
     private View car() {
@@ -589,6 +637,10 @@ final class Widgets {
             }
         }).refresh();
         return scroll;
+    }
+
+    private static int toF(int c) {
+        return Math.round(c * 9f / 5f + 32f);
     }
 
     private String temperature(int c) {
