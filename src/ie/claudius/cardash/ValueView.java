@@ -9,12 +9,11 @@ import ie.claudius.cardash.layout.Kind;
 
 /**
  * One vehicle value drawn as a bar or a gauge between a minimum and a
- * maximum, turning to the warning colour past a threshold. Unknown
- * stays unknown: no value draws an empty track and a dash, never zero.
+ * maximum. Past its warning threshold the whole box turns to the M3
+ * error colours. Unknown stays unknown: no value draws an empty track
+ * and a dash, never zero.
  */
 public final class ValueView extends android.view.View {
-
-    public static final int WARN = 0xFFFF5449;
 
     private final float d;
     private final Paint track = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -31,21 +30,36 @@ public final class ValueView extends android.view.View {
     private String warnDir = "above";
     private float value;
     private boolean known;
-    private int accent, warnColor = WARN;
+    /** Shown under the dash when the car cannot give this value, e.g. "Unavailable". */
+    private String note;
+    private boolean hot;
+    private final int accent, trackColor, text, subtext;
+    private android.graphics.drawable.Drawable calmBox, hotBox;
+    private int hotAccent, onHot;
 
     public ValueView(Context ctx, int trackColor, int accent, int text, int subtext) {
         super(ctx);
         d = ctx.getResources().getDisplayMetrics().density;
         this.accent = accent;
-        track.setColor(trackColor);
+        this.trackColor = trackColor;
+        this.text = text;
+        this.subtext = subtext;
         track.setStrokeCap(Paint.Cap.ROUND);
-        mark.setColor(subtext);
-        big.setColor(text);
+        big.setFontFeatureSettings("tnum");
         big.setTypeface(Fonts.hero(ctx));
         big.setTextAlign(Paint.Align.CENTER);
-        small.setColor(subtext);
         small.setTypeface(Fonts.display(ctx));
         small.setTextAlign(Paint.Align.CENTER);
+    }
+
+    /** The card behind the value, normally and past the warning threshold. */
+    public void setBoxes(android.graphics.drawable.Drawable normal, android.graphics.drawable.Drawable warning,
+                         int warningAccent, int onWarning) {
+        calmBox = normal;
+        hotBox = warning;
+        hotAccent = warningAccent;
+        onHot = onWarning;
+        setBackground(hot ? hotBox : calmBox);
     }
 
     public void configure(String label, String unit, boolean gauge,
@@ -57,23 +71,50 @@ public final class ValueView extends android.view.View {
         this.max = max;
         this.warn = warn;
         this.warnDir = warnDir;
+        update();
         invalidate();
     }
 
     public void setValue(boolean known, float value) {
-        if (known == this.known && value == this.value) return;
+        setValue(known, value, null);
+    }
+
+    /** Relabel (the outside temperature card becomes "Intake air" while that stands in for it). */
+    public void setLabel(String label) {
+        if (!label.equals(this.label)) {
+            this.label = label;
+            invalidate();
+        }
+    }
+
+    public void setValue(boolean known, float value, String note) {
+        if (known == this.known && value == this.value
+                && (note == null ? this.note == null : note.equals(this.note))) return;
+        this.note = note;
         this.known = known;
         this.value = value;
+        update();
         invalidate();
+    }
+
+    private void update() {
+        boolean now = known && Kind.warningHeld(hot, value, warn, warnDir, min, max);
+        if (now == hot) return;
+        hot = now;
+        if (calmBox != null) setBackground(hot ? hotBox : calmBox);
     }
 
     @Override
     protected void onDraw(Canvas c) {
         float w = getWidth(), h = getHeight();
         if (w <= 0 || h <= 0) return;
-        boolean hot = known && Kind.warning(value, warn, warnDir);
-        fill.setColor(hot ? warnColor : accent);
-        String text = known ? String.valueOf(Math.round(value)) : "—";
+        boolean red = hot && hotBox != null;
+        fill.setColor(red ? hotAccent : accent);
+        track.setColor(red ? M3.withAlpha(onHot, 0x33) : trackColor);
+        big.setColor(red ? onHot : text);
+        small.setColor(red ? onHot : subtext);
+        mark.setColor(red ? onHot : subtext);
+        String shown = known ? String.valueOf(Math.round(value)) : "—";
         float frac = known ? Kind.fraction(value, min, max) : 0f;
         float wfrac = Kind.fraction(warn, min, max);
 
@@ -99,9 +140,11 @@ public final class ValueView extends android.view.View {
             c.drawLine(cx + (float) Math.cos(a) * (rr - stroke * 0.75f), cy + (float) Math.sin(a) * (rr - stroke * 0.75f),
                     cx + (float) Math.cos(a) * (rr + stroke * 0.75f), cy + (float) Math.sin(a) * (rr + stroke * 0.75f), mark);
             big.setTextSize(s * 0.30f);
-            c.drawText(text, cx, cy + s * 0.10f, big);
+            float room = (s - 2 * stroke) * 0.78f, wide = big.measureText(shown);
+            if (wide > room) big.setTextSize(s * 0.30f * room / wide);   // four digits stay inside the ring
+            c.drawText(shown, cx, cy + s * 0.10f, big);
             small.setTextSize(Math.max(11 * d, s * 0.09f));
-            c.drawText(known ? unit.trim() : "", cx, cy + s * 0.27f, small);
+            c.drawText(known ? unit.trim() : note != null ? note : "", cx, cy + s * 0.27f, small);
             small.setTextSize(Math.max(12 * d, Math.min(labelH, 16 * d)));
             c.drawText(label, cx, h - 8 * d, small);
         } else {
@@ -115,11 +158,11 @@ public final class ValueView extends android.view.View {
             float valueSize = Math.max(18 * d, Math.min(h - p * 2 - lab - barH - 8 * d, 56 * d));
             big.setTextSize(valueSize);
             float baseY = h - p - barH - 6 * d;
-            c.drawText(text, p, baseY, big);
-            if (known) {
-                float tw = big.measureText(text);
-                small.setTextSize(Math.max(12 * d, valueSize * 0.32f));
-                c.drawText(unit.trim(), p + tw + 6 * d, baseY, small);
+            c.drawText(shown, p, baseY, big);
+            if (known || note != null) {
+                float tw = big.measureText(shown);
+                small.setTextSize(Math.max(12 * d, valueSize * (known ? 0.32f : 0.28f)));
+                c.drawText(known ? unit.trim() : note, p + tw + 6 * d, baseY, small);
             }
             float top = h - p - barH;
             track.setStyle(Paint.Style.FILL);

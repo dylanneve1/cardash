@@ -9,6 +9,9 @@ import android.os.Build;
 import java.util.ArrayList;
 import java.util.List;
 
+import ie.claudius.cardash.car.CarProfile;
+import ie.claudius.cardash.vehicle.VehicleHub;
+
 /**
  * User settings. Same SharedPreferences file as the tile assignments and
  * the cached weather position, so one clear-data wipes everything.
@@ -50,6 +53,11 @@ public final class Prefs {
     /** The OBD dongle chosen on the Bluetooth screen; absent = match a paired device by name. */
     public static final String OBD_ADDRESS = "obd_address";
     public static final String OBD_NAME = "obd_name";
+    /** Car profile: the VIN last read over OBD, and the user's overrides ("" = from the VIN). */
+    public static final String CAR_VIN = "car_vin";
+    public static final String CAR_MAKE = "car_make";
+    public static final String CAR_MODEL = "car_model";
+    public static final String CAR_BODY = "car_body";   // auto | 3door | 5door | estate | saloon
 
     public static final String W_SPEEDO = "speedo", W_TRIP = "trip", W_WEATHER = "weather";
     public static final String[] DASH_ALL = { W_SPEEDO, W_TRIP, W_WEATHER };
@@ -82,6 +90,43 @@ public final class Prefs {
         prefs(ctx).edit().putString(key, value).apply();
     }
 
+    /** The look of car pages that follow Settings. */
+    public static final String CAR_THEME = "car_theme";   // modern | classic
+
+    public static String carTheme(Context ctx) {
+        return get(ctx, CAR_THEME, "modern");
+    }
+
+    /** Remind to unplug the OBD dongle once the car is parked. */
+    public static final String UNPLUG = "unplug";   // on | off
+
+    public static boolean unplugReminder(Context ctx) {
+        return !"off".equals(get(ctx, UNPLUG, "on"));
+    }
+
+    /** The simulated vehicle: off by default, switched on in Diagnostics. */
+    public static final String SIM = "sim";   // off | on
+
+    /** True while the simulated vehicle stands in for the car. */
+    public static boolean simulating(Context ctx) {
+        return "on".equals(get(ctx, SIM, "off"));
+    }
+
+    /** The mode the vehicle hub should run in. */
+    public static String sourceMode(Context ctx) {
+        return simulating(ctx) ? VehicleHub.MODE_SIM : vehicleMode(ctx);
+    }
+
+    /** The mode for Diagnostics: every real source, or the simulator while it is on. */
+    public static String diagMode(Context ctx) {
+        return simulating(ctx) ? VehicleHub.MODE_SIM : VehicleHub.MODE_AUTO;
+    }
+
+    static void watch(Context ctx, SharedPreferences.OnSharedPreferenceChangeListener l, boolean on) {
+        if (on) prefs(ctx).registerOnSharedPreferenceChangeListener(l);
+        else prefs(ctx).unregisterOnSharedPreferenceChangeListener(l);
+    }
+
     // ---- OBD dongle -------------------------------------------------------
 
     /** The chosen dongle's Bluetooth address, or null when none was chosen. */
@@ -101,6 +146,11 @@ public final class Prefs {
 
     public static void clearObdDongle(Context ctx) {
         prefs(ctx).edit().remove(OBD_ADDRESS).remove(OBD_NAME).apply();
+    }
+
+    public static CarProfile carProfile(Context ctx) {
+        return CarProfile.of(get(ctx, CAR_MAKE, ""), get(ctx, CAR_MODEL, ""),
+                get(ctx, CAR_BODY, CarProfile.AUTO), get(ctx, CAR_VIN, null));
     }
 
     // ---- typed readers ----------------------------------------------------
@@ -188,7 +238,7 @@ public final class Prefs {
     }
 
     public static boolean showVehicle(Context ctx) {
-        return !"off".equals(vehicleMode(ctx));
+        return simulating(ctx) || !"off".equals(vehicleMode(ctx));
     }
 
     /** The middle-column widgets, in DASH_ALL order; may be empty. */
@@ -295,7 +345,7 @@ public final class Prefs {
     /** Everything that changes how the home screen is built, in one string. */
     public static String signature(Context ctx) {
         String[] keys = { SPEED, TEMP, CLOCK, SEED, SCRIM, MOTION, LAYOUT, HINT,
-                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE, SIDE };
+                DATE, MEDIA, VEHICLE, DASH, GAUGE, SCALE, SIDE, CAR_BODY, CAR_THEME, SIM };
         StringBuilder sb = new StringBuilder();
         for (String k : keys) sb.append(get(ctx, k, "")).append('|');
         String layout = get(ctx, HOME_LAYOUT, "");

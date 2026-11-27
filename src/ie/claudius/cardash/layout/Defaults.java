@@ -3,10 +3,11 @@ package ie.claudius.cardash.layout;
 import java.util.List;
 
 /**
- * The layouts the app starts with. {@link #home} reproduces the
- * three-column home screen the app has always had (clock column, dash
- * column, tiles), honouring the old Settings options, so nothing moves
- * until the user edits.
+ * The layouts the app starts with ({@link #full}). {@link #home}
+ * reproduces the three-column home screen the app has always had (clock
+ * column, dash column, tiles), honouring the old Settings options; it is
+ * the middle page, between a car page and an information page. A layout
+ * the user has saved is never replaced by these.
  */
 public final class Defaults {
 
@@ -74,25 +75,52 @@ public final class Defaults {
         return l;
     }
 
-    /** A page of vehicle-data items: three gauges, doors, a speed bar and a way back to settings. */
-    public static HomeLayout.Page vehiclePage(int cols, int rows) {
+    /**
+     * The layout a fresh install gets: car information on the left, the
+     * home page in the middle (where it starts), useful information on
+     * the right. With vehicle data switched off there is no car page.
+     */
+    public static HomeLayout full(Options o, int cols, int rows) {
+        HomeLayout l = home(o, cols, rows);
+        if (o.vehicle) l.insertPage(0, carPage(cols, rows));
+        l.pages.add(infoPage(cols, rows));
+        return l;
+    }
+
+    /** Car information: RPM, speed, coolant, fuel and outside temperature round the car. */
+    public static HomeLayout.Page carPage(int cols, int rows) {
         HomeLayout t = new HomeLayout(TC, TR);
         HomeLayout.Page p = new HomeLayout.Page();
         t.pages.add(p);
-        String[] fields = { "coolant", "fuel", "rpm" };
-        for (int i = 0; i < 3; i++) {
-            HomeLayout.Item it = new HomeLayout.Item(Kind.VEHICLE, i * 4, 0, 4, 4);
-            it.settings.putAll(Kind.vehicleDefaults(fields[i]));
-            it.settings.put("style", "gauge");
-            p.items.add(it);
-        }
-        p.items.add(new HomeLayout.Item(Kind.DOORS, 0, 4, 3, 4));
-        HomeLayout.Item sp = new HomeLayout.Item(Kind.VEHICLE, 3, 4, 8, 2);
-        sp.settings.putAll(Kind.vehicleDefaults("speed"));
-        p.items.add(sp);
-        p.items.add(new HomeLayout.Item(Kind.CHIPS, 3, 6, 8, 1));
-        p.items.add(new HomeLayout.Item(Kind.SETTINGS, 11, 7, 1, 1));
+        p.theme = HomeLayout.AUTO;
+        p.items.add(vehicle("rpm", "gauge", 0, 0, 4, 4));
+        p.items.add(new HomeLayout.Item(Kind.DOORS, 4, 0, 4, 8));
+        p.items.add(vehicle("speed", "gauge", 8, 0, 4, 4));
+        p.items.add(vehicle("coolant", "gauge", 0, 4, 4, 4));
+        p.items.add(vehicle("fuel", "bar", 8, 4, 4, 2));
+        p.items.add(vehicle("outside", "bar", 8, 6, 4, 2));
         t.rescale(cols, rows);
         return t.pages.get(0);
+    }
+
+    /** Clock and date, now playing, weather and the trip meter. */
+    public static HomeLayout.Page infoPage(int cols, int rows) {
+        HomeLayout t = new HomeLayout(TC, TR);
+        HomeLayout.Page p = new HomeLayout.Page();
+        t.pages.add(p);
+        p.items.add(new HomeLayout.Item(Kind.CLOCK, 0, 0, 6, 3));
+        p.items.add(new HomeLayout.Item(Kind.DATE, 0, 3, 6, 1));
+        p.items.add(new HomeLayout.Item(Kind.NOWPLAYING, 0, 4, 6, 4));
+        p.items.add(new HomeLayout.Item(Kind.WEATHER, 6, 0, 6, 4));
+        p.items.add(new HomeLayout.Item(Kind.TRIP, 6, 4, 6, 4));
+        t.rescale(cols, rows);
+        return t.pages.get(0);
+    }
+
+    private static HomeLayout.Item vehicle(String field, String style, int x, int y, int w, int h) {
+        HomeLayout.Item it = new HomeLayout.Item(Kind.VEHICLE, x, y, w, h);
+        it.settings.putAll(Kind.vehicleDefaults(field));
+        it.settings.put("style", style);
+        return it;
     }
 }

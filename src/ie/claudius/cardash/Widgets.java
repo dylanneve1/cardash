@@ -16,11 +16,10 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
+import ie.claudius.cardash.car.Compass;
 import ie.claudius.cardash.dash.Speedo;
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.layout.HomeLayout.Item;
@@ -38,7 +37,7 @@ import ie.claudius.cardash.vehicle.VehicleState;
  */
 final class Widgets {
 
-    static final int CLOCK = 1, NP = 2, WX = 4, VEH = 8, TRIP = 16, SPEED = 32;
+    static final int CLOCK = 1, NP = 2, WX = 4, VEH = 8, TRIP = 16, SPEED = 32, HEADING = 64;
 
     /** A built widget that can redraw itself from the shared live state. */
     private abstract static class Live {
@@ -74,6 +73,8 @@ final class Widgets {
     VehicleState lastVehicle;
     float lastKph;
     boolean lastFix;
+    /** Direction of travel, or negative while unknown. */
+    float heading = -1f;
 
     Widgets(Context ctx, Host host) {
         this.ctx = ctx;
@@ -113,7 +114,7 @@ final class Widgets {
             case Kind.TRIP: v = trip(w, h); break;
             case Kind.WEATHER: v = weather(w, h); break;
             case Kind.VEHICLE: v = vehicle(it); break;
-            case Kind.DOORS: v = doors(); break;
+            case Kind.DOORS: v = car(); break;
             case Kind.ALLAPPS: v = allApps(w, h); break;
             case Kind.SETTINGS: v = settingsButton(w, h); break;
             case Kind.CHIPS: v = chips(editing); break;
@@ -131,6 +132,51 @@ final class Widgets {
                 }
             });
         }
+        return v;
+    }
+
+    // ---- the classic cluster page ---------------------------------------------------
+
+    View classicCluster(boolean editing) {
+        final ClassicCluster v = new ClassicCluster(ctx,
+                editing ? ctx.getString(R.string.classic_edit_note) : null);
+        add(new Live(CLOCK | HEADING | VEH | TRIP) {
+            @Override void refresh() {
+                Motion.setText(v.time, new SimpleDateFormat(Prefs.clockPattern(ctx), Locale.getDefault())
+                        .format(new Date()));
+                Motion.setText(v.heading, heading < 0 ? "—" : Compass.point(heading));
+                VehicleState s = lastVehicle != null ? lastVehicle : new VehicleState();
+                v.car.setThreeDoor(Prefs.carProfile(ctx).threeDoor());
+                v.car.setState(s);
+                int u = VehicleState.UNKNOWN_INT;
+                String t = s.outsideC != u ? temperature(s.outsideC)
+                        : s.intakeC != u ? temperature(s.intakeC) + " " + ctx.getString(R.string.intake_label)
+                        : "—";
+                Motion.setText(v.temperature, "\u2744\uFE0E  " + t);
+                boolean miles = Prefs.mph(ctx);
+                String unit = miles ? " mi" : " km";
+                Motion.setText(v.odometer, "Odo " + (s.odometerKm == u ? "—"
+                        : (miles ? Math.round(s.odometerKm / 1.609344f) : s.odometerKm) + unit));
+                Trip tr = host.trip();
+                Motion.setText(v.trip, "Trip " + (tr == null ? "—" : Trip.distance(tr.metres(), miles) + unit));
+                // The same default limits as the gauges.
+                StringBuilder warn = new StringBuilder();
+                if (s.coolantC != u && s.coolantC >= Kind.vehicleRange("coolant")[2]) {
+                    warn.append("Coolant ").append(temperature(s.coolantC)).append("   ");
+                }
+                if (s.rpm != u && s.rpm >= Kind.vehicleRange("rpm")[2]) warn.append(s.rpm).append(" rpm");
+                Motion.setText(v.warning, warn.toString().trim());
+                v.warning.setVisibility(warn.length() == 0 ? View.GONE : View.VISIBLE);
+            }
+        }).refresh();
+        v.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View view) {
+                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                host.enterEdit();
+                return true;
+            }
+        });
         return v;
     }
 
@@ -426,11 +472,11 @@ final class Widgets {
                 boolean miles = Prefs.mph(ctx);
                 float m = tr.metres();
                 long ms = tr.movingMs();
-                Motion.swapText(dist, Trip.distance(m, miles) + (miles ? " mi" : " km"));
+                Motion.setText(dist, Trip.distance(m, miles) + (miles ? " mi" : " km"));
                 int avg = Trip.average(m, ms, miles);
                 String text = Trip.duration(ms);
                 if (avg >= 0) text += " · " + avg + (miles ? " mph " : " km/h ") + ctx.getString(R.string.trip_avg);
-                Motion.swapText(detail, text);
+                Motion.setText(detail, text);
             }
         }).refresh();
         return card;
@@ -443,32 +489,58 @@ final class Widgets {
         int[] def = Kind.vehicleRange(field);
         final ValueView v = new ValueView(ctx, M3.withAlpha(m3.onSurface(), 0x26), m3.primary(),
                 m3.onSurface(), m3.onSurfaceVariant());
-        v.setBackground(Shapes.round(d, m3.surfaceContainer(), 28));
+        v.setBoxes(Shapes.round(d, m3.surfaceContainer(), 28), Shapes.round(d, m3.errorContainer(), 28),
+                m3.error(), m3.onErrorContainer());
         v.configure(Kind.vehicleLabel(field), Kind.vehicleUnit(field), "gauge".equals(it.get("style", "bar")),
                 it.getInt("min", def[0]), it.getInt("max", def[1]), it.getInt("warn", def[2]),
                 it.get("warndir", Kind.vehicleWarnDir(field)));
+        final boolean outside = "outside".equals(field);
+        final boolean f = outside && Prefs.fahrenheit(ctx);
+        if (f) {
+            v.configure(Kind.vehicleLabel(field), "°F", "gauge".equals(it.get("style", "bar")),
+                    toF(it.getInt("min", def[0])), toF(it.getInt("max", def[1])), toF(it.getInt("warn", def[2])),
+                    it.get("warndir", Kind.vehicleWarnDir(field)));
+        }
         add(new Live(VEH) {
             @Override void refresh() {
                 VehicleState s = lastVehicle;
                 int val = VehicleState.UNKNOWN_INT;
+                String note = null;
                 if (s != null) {
-                    if ("fuel".equals(field)) val = s.fuelPercent;
-                    else if ("rpm".equals(field)) val = s.rpm;
+                    if ("fuel".equals(field)) {
+                        val = s.fuelPercent;
+                        if (s.fuelUnsupported) note = ctx.getString(R.string.unavailable);
+                    } else if ("rpm".equals(field)) val = s.rpm;
                     else if ("speed".equals(field)) val = s.speedKph;
+                    else if (outside) val = s.outsideC;
                     else val = s.coolantC;
                 }
-                v.setValue(val != VehicleState.UNKNOWN_INT, val);
+                if (outside) {
+                    // Intake air stands in only when nothing reports outside air, and says so.
+                    boolean intake = val == VehicleState.UNKNOWN_INT && s != null
+                            && s.intakeC != VehicleState.UNKNOWN_INT;
+                    if (intake) val = s.intakeC;
+                    v.setLabel(ctx.getString(intake ? R.string.intake_label : R.string.outside_label));
+                }
+                boolean known = val != VehicleState.UNKNOWN_INT;
+                v.setValue(known, known && f ? toF(val) : val, note);
             }
         }).refresh();
         return v;
     }
 
-    private View doors() {
-        final DoorsView v = new DoorsView(ctx, M3.withAlpha(m3.onSurface(), 0x22), m3.primary(),
-                M3.withAlpha(m3.onSurfaceVariant(), 0x88), m3.onSurfaceVariant());
+    private static int toF(int c) {
+        return Math.round(c * 9f / 5f + 32f);
+    }
+
+    private View car() {
+        final CarView v = new CarView(ctx, m3.surfaceContainer());
         v.setBackground(Shapes.round(d, m3.surfaceContainer(), 28));
         add(new Live(VEH) {
-            @Override void refresh() { v.setState(lastVehicle); }
+            @Override void refresh() {
+                v.setThreeDoor(Prefs.carProfile(ctx).threeDoor());
+                v.setState(lastVehicle);
+            }
         }).refresh();
         return v;
     }
@@ -477,73 +549,79 @@ final class Widgets {
      * Fuel / coolant / rpm / doors as pills. Nothing plugged in means
      * nothing to show — an empty strip of dashes looks broken, so the
      * strip stays empty until a source reports something.
+     *
+     * Every chip is made once, in a fixed order, and only its text and
+     * visibility change: live data arrives several times a second, so
+     * nothing here fades, moves or is rebuilt. The strip and the gauges
+     * redraw from the same state in the same pass, so they always agree.
      */
     private View chips(final boolean editing) {
         final HorizontalScrollView scroll = new HorizontalScrollView(ctx);
         scroll.setHorizontalScrollBarEnabled(false);
-        final LinearLayout bar = new LinearLayout(ctx);
+        LinearLayout bar = new LinearLayout(ctx);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        Motion.animateChildren(bar);
         scroll.addView(bar, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
         scroll.setFillViewport(true);
-        final Map<String, TextView> byKey = new HashMap<>();
+        // An open door comes first: it must not be the chip that scrolls out of sight.
+        final TextView doors = chip(bar), fuel = chip(bar), coolant = chip(bar), rpm = chip(bar), sample = chip(bar);
         add(new Live(VEH) {
             @Override void refresh() {
                 VehicleState s = lastVehicle;
                 if (s == null) s = new VehicleState();
                 boolean lowFuel = s.fuelPercent != VehicleState.UNKNOWN_INT && s.fuelPercent <= 15;
-                chip(bar, byKey, "fuel", s.fuelPercent != VehicleState.UNKNOWN_INT ? "Fuel " + s.fuelPercent + "%" : null,
+                show(fuel, s.fuelPercent != VehicleState.UNKNOWN_INT ? "Fuel " + s.fuelPercent + "%" : null,
                         lowFuel ? m3.tertiaryContainer() : m3.surfaceContainerHigh(),
                         lowFuel ? m3.onTertiaryContainer() : m3.onSurface());
-                chip(bar, byKey, "coolant", s.coolantC != VehicleState.UNKNOWN_INT ? s.coolantC + "°C" : null,
+                show(coolant, s.coolantC != VehicleState.UNKNOWN_INT ? s.coolantC + "°C" : null,
                         m3.surfaceContainerHigh(), m3.onSurface());
-                chip(bar, byKey, "rpm", s.rpm != VehicleState.UNKNOWN_INT && s.rpm > 0 ? s.rpm + " rpm" : null,
+                show(rpm, s.rpm != VehicleState.UNKNOWN_INT && s.rpm > 0 ? s.rpm + " rpm" : null,
                         m3.surfaceContainerHigh(), m3.onSurface());
                 int open = s.openDoors();
-                chip(bar, byKey, "doors", open > 0 ? (open == 1 ? "Door open" : open + " doors open") : null,
+                show(doors, open > 0 ? (open == 1 ? "Door open" : open + " doors open") : null,
                         m3.primaryContainer(), m3.onPrimaryContainer());
-                if (editing && byKey.isEmpty()) {
-                    chip(bar, byKey, "sample", "Vehicle strip", m3.surfaceContainerHigh(), m3.onSurfaceVariant());
-                } else if (!editing) {
-                    chip(bar, byKey, "sample", null, 0, 0);
-                }
+                boolean empty = fuel.getVisibility() != View.VISIBLE && coolant.getVisibility() != View.VISIBLE
+                        && rpm.getVisibility() != View.VISIBLE && doors.getVisibility() != View.VISIBLE;
+                show(sample, editing && empty ? "Vehicle strip" : null,
+                        m3.surfaceContainerHigh(), m3.onSurfaceVariant());
             }
         }).refresh();
         return scroll;
     }
 
-    /** Chips are keyed so a value that merely changed updates in place; only a chip that appears or goes animates. */
-    private void chip(LinearLayout bar, Map<String, TextView> byKey, String key, String text, int fill, int onFill) {
-        TextView t = byKey.get(key);
+    private String temperature(int c) {
+        return Prefs.fahrenheit(ctx) ? toF(c) + "°F" : c + "°C";
+    }
+
+    private TextView chip(LinearLayout bar) {
+        TextView t = new TextView(ctx);
+        t.setTypeface(Fonts.body(ctx));
+        t.setFontFeatureSettings("tnum");   // digits of one width, so a changing number doesn't jiggle
+        t.setTextSize(15);
+        t.setPadding(dp(14), dp(8), dp(14), dp(8));
+        t.setVisibility(View.GONE);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = dp(8);
+        bar.addView(t, lp);
+        return t;
+    }
+
+    private void show(TextView t, String text, int fill, int onFill) {
         if (text == null) {
-            if (t != null) { bar.removeView(t); byKey.remove(key); }
+            if (t.getVisibility() != View.GONE) t.setVisibility(View.GONE);
             return;
         }
-        if (t == null) {
-            t = new TextView(ctx);
-            t.setTypeface(Fonts.body(ctx));
-            t.setTextSize(15);
-            t.setPadding(dp(14), dp(8), dp(14), dp(8));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.rightMargin = dp(8);
-            t.setLayoutParams(lp);
-            t.setText(text);
-            byKey.put(key, t);
-            bar.addView(t);
-        } else {
-            Motion.swapText(t, text);
-        }
+        Motion.setText(t, text);
         // Restyle only on a role change (fuel turning low), so the ripple isn't rebuilt on every update.
         Integer styled = (Integer) t.getTag();
         if (styled == null || styled != fill) {
             t.setTextColor(onFill);
             t.setBackground(Shapes.pill(d, fill, M3.withAlpha(onFill, 0x33)));
             t.setTag(fill);
-            if (styled != null) Motion.pop(t);
         }
+        if (t.getVisibility() != View.VISIBLE) t.setVisibility(View.VISIBLE);
     }
 
     // ---- now playing --------------------------------------------------------------

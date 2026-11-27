@@ -34,7 +34,7 @@
     <string name="s_speed_kmh">km/h</string>
     <string name="s_speed_mph">mph</string>
     <string name="s_temp">Temperature</string>
-    <string name="s_temp_caption">Unit on the weather card</string>
+    <string name="s_temp_caption">Unit for weather and outside temperature</string>
     <string name="s_temp_c">°C</string>
     <string name="s_temp_f">°F</string>
     <string name="s_clock">Clock</string>
@@ -161,7 +161,7 @@
     <string name="edit_page_add">+ Page</string>
     <string name="edit_page_remove">Delete page</string>
     <string name="edit_page_empty">Empty page</string>
-    <string name="edit_page_vehicle">Vehicle page (gauges, doors, speed)</string>
+    <string name="edit_page_vehicle">Car page (gauges, car, temperature)</string>
     <string name="edit_page_remove_q">Delete this page and everything on it?</string>
     <string name="edit_page_clear_q">This is the only page. Clear everything on it?</string>
     <string name="edit_page_clear">Clear</string>
@@ -181,6 +181,45 @@
     <string name="s_side_caption">Mirrors the layout so the clock side is next to the driver</string>
     <string name="s_side_lhd">Left</string>
     <string name="s_side_rhd">Right</string>
+
+    <string name="unavailable">Unavailable</string>
+    <string name="outside_label">Outside</string>
+    <string name="intake_label">Intake air</string>
+    <string name="s_car_make">Make</string>
+    <string name="s_car_model">Model</string>
+    <string name="s_car_body">Body</string>
+    <string name="s_car_body_caption">Draws the car with the right doors; the VIN doesn\'t say how many there are</string>
+    <string name="s_car_choose">Change</string>
+    <string name="s_car_3door">3-door</string>
+    <string name="s_car_5door">5-door</string>
+    <string name="s_car_estate">Estate</string>
+    <string name="s_car_saloon">Saloon</string>
+    <string name="s_car_auto">Auto (from VIN)</string>
+    <string name="s_car_unknown">Not known yet. Read from the VIN once the OBD dongle connects.</string>
+    <string name="s_car_from_vin">From VIN: %1$s</string>
+    <string name="s_car_chosen">Chosen: %1$s</string>
+
+    <string name="unplug_channel">OBD dongle reminder</string>
+    <string name="unplug_title">Unplug the OBD dongle</string>
+    <string name="unplug_text">Unplug the OBD dongle to avoid draining the battery</string>
+    <string name="s_unplug">Unplug reminder</string>
+    <string name="s_unplug_caption">Say so when the engine has been off for 3 minutes and a dongle is chosen</string>
+    <string name="s_on">On</string>
+    <string name="s_off">Off</string>
+
+    <string name="s_car_theme">Car page style</string>
+    <string name="s_car_theme_caption">Gauges round the car, or a monochrome cluster screen</string>
+    <string name="s_car_theme_modern">Modern</string>
+    <string name="s_car_theme_classic">Classic VW</string>
+    <string name="edit_style">Style</string>
+    <string name="edit_style_title">Page style</string>
+    <string name="classic_edit_note">Classic VW style. Choose Style → Modern to edit this page\'s widgets.</string>
+
+    <string name="sim_badge">SIMULATED VEHICLE</string>
+    <string name="diag_sim">Simulated vehicle</string>
+    <string name="diag_sim_caption">Try the dash without a car. Control it from the Phone settings page, or: content call --uri content://ie.claudius.cardash.diag --method sim --arg \"rpm=3000,door_fl=1\"</string>
+    <string name="diag_sim_start">Start simulator</string>
+    <string name="diag_sim_stop">Stop simulator</string>
 
     <string name="s_bt">Bluetooth / OBD dongle</string>
     <string name="s_bt_caption">Search, pair and choose the OBD-II dongle</string>

@@ -26,6 +26,7 @@ import ie.claudius.cardash.Receivers;
 import ie.claudius.cardash.vehicle.HcnSource;
 import ie.claudius.cardash.vehicle.JancarSource;
 import ie.claudius.cardash.vehicle.ObdSource;
+import ie.claudius.cardash.vehicle.SimVehicle;
 import ie.claudius.cardash.vehicle.VehicleHub;
 import ie.claudius.cardash.vehicle.VehicleState;
 
@@ -53,6 +54,8 @@ import ie.claudius.cardash.vehicle.VehicleState;
  *          (risky targets also need --extra confirm:s:yes)
  *   adb shell content call  --uri content://ie.claudius.cardash.diag --method sources --arg 5
  *   adb shell content call  --uri content://ie.claudius.cardash.diag --method obd --arg 20
+ *   adb shell content call  --uri content://ie.claudius.cardash.diag --method sim --arg "enable=1,rpm=3000,door_fl=1"
+ *   adb shell content call  --uri content://ie.claudius.cardash.diag --method sim --arg "cycle=1"
  *   adb shell content call  --uri content://ie.claudius.cardash.diag --method set --arg speed_unit --extra value:s:mph
  * </pre>
  *
@@ -137,7 +140,7 @@ public final class DiagProvider extends ContentProvider {
             default:
                 text = "commands: unit | packages | sweep | surface/<pkg> | activities[/<pkg>][?q=..] | actions | aa | serial | prefs\n"
                         + "calls:    sniff <seconds> [actions:s:a,b]  |  sources <seconds>  |  "
-                        + "obd <seconds>  |  launch <pkg/Class> [confirm:s:yes]  |  set <key> value:s:<v>  |  get <key>\n"
+                        + "obd <seconds>  |  sim <name=value,...>  |  launch <pkg/Class> [confirm:s:yes]  |  set <key> value:s:<v>  |  get <key>\n"
                         + "e.g.      set canbox_protocols value:s:\"Raise, Hiworld\"  "
                         + "records the factory-settings list for the report";
         }
@@ -185,6 +188,21 @@ public final class DiagProvider extends ContentProvider {
                 String err = Probe.launch(ctx, parts[0], cls);
                 if (err == null) out.putString("launched", parts[0] + "/" + cls);
                 else out.putString("error", err);
+                break;
+            }
+            case "sim": {
+                Map<String, String> changes = SimVehicle.pairs(arg);
+                // "enable=1" / "enable=0" switches the simulator itself, as the Diagnostics button does.
+                String enable = changes.remove("enable");
+                if (enable != null) Prefs.set(ctx, Prefs.SIM, "1".equals(enable) ? "on" : "off");
+                long now = System.currentTimeMillis();
+                String bad = SimVehicle.SHARED.apply(changes, now);
+                if (!bad.isEmpty()) out.putString("error", "not understood: " + bad);
+                out.putString("simulator", Prefs.simulating(ctx) ? "on"
+                        : "off (add enable=1, or switch it on in Diagnostics)");
+                out.putString("cycle", SimVehicle.SHARED.cycling() ? "playing" : "stopped");
+                out.putString("values", SimVehicle.SHARED.values(now).toString()
+                        .replace(String.valueOf(VehicleState.UNKNOWN_INT), "na"));
                 break;
             }
             case "set": {
@@ -269,7 +287,7 @@ public final class DiagProvider extends ContentProvider {
         main.post(new Runnable() {
             @Override
             public void run() {
-                hub.start(ctx, probe, VehicleHub.MODE_AUTO);
+                hub.start(ctx, probe, Prefs.diagMode(ctx));
                 synchronized (lock) {
                     lock.notifyAll();
                 }
@@ -302,6 +320,7 @@ public final class DiagProvider extends ContentProvider {
                 sb.append("  paired: ").append(d.paired).append("\n  chosen: ").append(d.chosen)
                         .append("\n  matched: ").append(d.matched)
                         .append("\n  socket: ").append(d.socket).append('\n');
+                sb.append(ObdText.link(d));
                 for (Map.Entry<String, String> raw : d.raw.entrySet()) {
                     sb.append("  ").append(raw.getKey()).append(" -> ").append(raw.getValue()).append('\n');
                 }

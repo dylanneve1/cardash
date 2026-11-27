@@ -14,8 +14,11 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import ie.claudius.cardash.bt.BluetoothActivity;
+import ie.claudius.cardash.car.CarProfile;
+import ie.claudius.cardash.car.Vin;
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.diag.DiagnosticsActivity;
+import ie.claudius.cardash.layout.HomeLayout;
 import ie.claudius.cardash.remote.QrView;
 import ie.claudius.cardash.remote.RemoteServer;
 
@@ -208,6 +211,22 @@ public class SettingsActivity extends Activity {
                         new Trip(SettingsActivity.this).reset();
                     }
                 }));
+        column.addView(card, cardParams(dp(16)));
+
+        // ---- the car ----
+        card = card();
+        card.addView(carThemeRow());
+        card.addView(divider());
+        card.addView(carRow(R.string.s_car_make, Prefs.CAR_MAKE));
+        card.addView(divider());
+        card.addView(carRow(R.string.s_car_model, Prefs.CAR_MODEL));
+        card.addView(divider());
+        card.addView(row(R.string.s_car_body, R.string.s_car_body_caption, Prefs.CAR_BODY, CarProfile.AUTO,
+                CarProfile.BODIES, new int[] { R.string.s_vehicle_auto, R.string.s_car_3door,
+                        R.string.s_car_5door, R.string.s_car_estate, R.string.s_car_saloon }, false));
+        card.addView(divider());
+        card.addView(row(R.string.s_unplug, R.string.s_unplug_caption, Prefs.UNPLUG, "on",
+                new String[] { "on", "off" }, new int[] { R.string.s_on, R.string.s_off }, false));
         column.addView(card, cardParams(dp(16)));
 
         // ---- units ----
@@ -528,6 +547,70 @@ public class SettingsActivity extends Activity {
         }
         row.addView(hs);
         return row;
+    }
+
+    /** Not a plain pref: choosing also brings a saved layout's car pages back in line. */
+    private View carThemeRow() {
+        LinearLayout row = rowShell(R.string.s_car_theme, R.string.s_car_theme_caption);
+        final LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.HORIZONTAL);
+        final String[] values = { HomeLayout.MODERN, HomeLayout.CLASSIC };
+        int[] labels = { R.string.s_car_theme_modern, R.string.s_car_theme_classic };
+        for (int i = 0; i < values.length; i++) {
+            final String value = values[i];
+            final TextView opt = pill(getString(labels[i]), value.equals(Prefs.carTheme(this)));
+            opt.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    LayoutStore.setCarTheme(SettingsActivity.this, value);
+                    for (int j = 0; j < group.getChildCount(); j++) {
+                        TextView o = (TextView) group.getChildAt(j);
+                        style(o, o == opt);
+                    }
+                    Motion.pop(opt);
+                }
+            });
+            group.addView(opt);
+        }
+        row.addView(group);
+        return row;
+    }
+
+    /** Make or model: from the VIN unless chosen here. */
+    private View carRow(final int titleRes, final String key) {
+        final boolean isMake = Prefs.CAR_MAKE.equals(key);
+        LinearLayout row = rowShell(titleRes, R.string.s_car_unknown);
+        TextView caption = (TextView) ((ViewGroup) row.getChildAt(0)).getChildAt(1);
+        final CarProfile car = Prefs.carProfile(this);
+        String shown = isMake ? car.make : car.model;
+        if (shown != null) {
+            caption.setText(getString(Prefs.get(this, key, "").isEmpty()
+                    ? R.string.s_car_from_vin : R.string.s_car_chosen, shown));
+        }
+        TextView button = pill(getString(R.string.s_car_choose), false);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Pop pop = new Pop(SettingsActivity.this, m3, getString(titleRes));
+                pop.row(getString(R.string.s_car_auto), chooseCar(key, ""));
+                for (String s : isMake ? Vin.makes() : Vin.modelsOf(car.make)) pop.row(s, chooseCar(key, s));
+                pop.button(getString(android.R.string.cancel), null, false).show();
+            }
+        });
+        row.addView(button);
+        return row;
+    }
+
+    private Runnable chooseCar(final String key, final String value) {
+        return new Runnable() {
+            @Override
+            public void run() {
+                Prefs.set(SettingsActivity.this, key, value);
+                // A model belongs to a make.
+                if (Prefs.CAR_MAKE.equals(key)) Prefs.set(SettingsActivity.this, Prefs.CAR_MODEL, "");
+                rebuild(false);
+            }
+        };
     }
 
     /** A row whose button opens another screen. */

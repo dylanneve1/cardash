@@ -48,7 +48,7 @@ public final class Kind {
         this.options = Collections.unmodifiableList(l);
     }
 
-    private static final String[] VFIELDS = { "coolant", "fuel", "rpm", "speed" };
+    private static final String[] VFIELDS = { "coolant", "fuel", "rpm", "speed", "outside" };
 
     private static final List<Kind> ALL;
     static {
@@ -73,7 +73,7 @@ public final class Kind {
                 new Option("max", "Maximum", 120, -1000, 100000, 10),
                 new Option("warn", "Warning at", 110, -1000, 100000, 5),
                 new Option("warndir", "Warn when", "above", "above", "below")));
-        k.add(new Kind(DOORS, "Doors", 2, 2, 2, 3));
+        k.add(new Kind(DOORS, "Car (doors)", 2, 2, 3, 4));
         k.add(new Kind(ALLAPPS, "All apps button", 2, 1, 3, 1));
         k.add(new Kind(SETTINGS, "Settings button", 1, 1, 1, 1));
         k.add(new Kind(CHIPS, "Vehicle strip", 3, 1, 4, 1));
@@ -104,8 +104,9 @@ public final class Kind {
     /** {min, max, warn} for a vehicle field, and whether the warning is for low values. */
     public static int[] vehicleRange(String field) {
         if ("fuel".equals(field)) return new int[] { 0, 100, 15 };
-        if ("rpm".equals(field)) return new int[] { 0, 8000, 6500 };
+        if ("rpm".equals(field)) return new int[] { 0, 8000, 5500 };
         if ("speed".equals(field)) return new int[] { 0, 220, 130 };
+        if ("outside".equals(field)) return new int[] { -20, 50, 40 };
         return new int[] { 0, 120, 110 }; // coolant
     }
 
@@ -124,6 +125,7 @@ public final class Kind {
         if ("fuel".equals(field)) return "Fuel";
         if ("rpm".equals(field)) return "RPM";
         if ("speed".equals(field)) return "Speed";
+        if ("outside".equals(field)) return "Outside";
         return "Coolant";
     }
 
@@ -148,6 +150,23 @@ public final class Kind {
         if (max <= min) return 0f;
         float f = (value - min) / (max - min);
         return f < 0f ? 0f : (f > 1f ? 1f : f);
+    }
+
+    /** The stepper increment for a vehicle field's minimum, maximum and warning. */
+    public static int vehicleStep(String field) {
+        if ("rpm".equals(field)) return 250;
+        return 5;
+    }
+
+    /**
+     * {@link #warning} with a little hysteresis, so a value hovering on the
+     * threshold doesn't flash the box: once warning, it takes 2% of the
+     * range back past the threshold to clear.
+     */
+    public static boolean warningHeld(boolean was, float value, float warn, String dir, float min, float max) {
+        if (warning(value, warn, dir)) return true;
+        float slack = Math.max(0f, (max - min) * 0.02f);
+        return was && warning(value, "below".equals(dir) ? warn + slack : warn - slack, dir);
     }
 
     /** True when {@code value} is past the warning threshold in the configured direction. */

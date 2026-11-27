@@ -55,18 +55,42 @@ public final class HomeLayout {
         }
     }
 
+    /** Car page looks: the widgets as laid out, the classic cluster screen, or whatever Settings says. */
+    public static final String MODERN = "modern", CLASSIC = "classic", AUTO = "auto";
+
     public static final class Page {
         public final List<Item> items = new ArrayList<>();
+        /** {@link #MODERN}, {@link #CLASSIC}, {@link #AUTO} (a car page), or null for an ordinary page. */
+        public String theme;
+
+        /** @param carSetting the Settings choice for car pages */
+        public boolean classic(String carSetting) {
+            return CLASSIC.equals(AUTO.equals(theme) ? carSetting : theme);
+        }
+
+        /** A page the "car page style" setting applies to. */
+        public boolean isCarPage() {
+            if (theme != null) return true;
+            boolean car = false;
+            for (Item i : items) {
+                if (Kind.APP.equals(i.type)) return false;
+                car |= Kind.DOORS.equals(i.type);
+            }
+            return car;
+        }
 
         public Page copy() {
             Page p = new Page();
             for (Item i : items) p.items.add(i.copy());
+            p.theme = theme;
             return p;
         }
     }
 
     public int cols, rows;
     public final List<Page> pages = new ArrayList<>();
+    /** The page the home screen opens on. */
+    public int start;
 
     public HomeLayout(int cols, int rows) {
         this.cols = Math.max(1, cols);
@@ -76,12 +100,28 @@ public final class HomeLayout {
     public HomeLayout copy() {
         HomeLayout l = new HomeLayout(cols, rows);
         for (Page p : pages) l.pages.add(p.copy());
+        l.start = start;
         return l;
     }
 
     public boolean hasItem(String type) {
         for (Page p : pages) for (Item i : p.items) if (i.type.equals(type)) return true;
         return false;
+    }
+
+    // ---- pages ------------------------------------------------------------------
+
+    /** Insert a page, keeping the start page the same page. */
+    public void insertPage(int at, Page p) {
+        if (at <= start && !pages.isEmpty()) start++;
+        pages.add(at, p);
+    }
+
+    /** Remove a page; removing the start page leaves its neighbour as the start. */
+    public void removePage(int at) {
+        pages.remove(at);
+        if (at < start) start--;
+        start = Math.max(0, Math.min(start, pages.size() - 1));
     }
 
     // ---- mirror ---------------------------------------------------------------
@@ -123,6 +163,7 @@ public final class HomeLayout {
         root.put("v", (double) VERSION);
         root.put("cols", (double) cols);
         root.put("rows", (double) rows);
+        root.put("start", (double) start);
         List<Object> pl = new ArrayList<>();
         for (Page p : pages) {
             Map<String, Object> pm = new LinkedHashMap<>();
@@ -138,6 +179,7 @@ public final class HomeLayout {
                 il.add(im);
             }
             pm.put("items", il);
+            if (p.theme != null) pm.put("theme", p.theme);
             pl.add(pm);
         }
         root.put("pages", pl);
@@ -163,6 +205,8 @@ public final class HomeLayout {
         for (Object po : (List<Object>) pl) {
             if (!(po instanceof Map) || l.pages.size() >= MAX_PAGES) continue;
             Page page = new Page();
+            Object theme = ((Map<String, Object>) po).get("theme");
+            if (MODERN.equals(theme) || CLASSIC.equals(theme) || AUTO.equals(theme)) page.theme = (String) theme;
             Object il = ((Map<String, Object>) po).get("items");
             if (il instanceof List) {
                 for (Object io : (List<Object>) il) {
@@ -184,6 +228,7 @@ public final class HomeLayout {
             l.pages.add(page);
         }
         if (l.pages.isEmpty()) l.pages.add(new Page());
+        l.start = Math.max(0, Math.min(num(root.get("start"), 0), l.pages.size() - 1));
         Arrange.repair(l);
         return l;
     }

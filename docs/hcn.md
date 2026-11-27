@@ -149,8 +149,9 @@ door properties and `key_can_gear` once a second, and maps:
   override the live GPS speed on the gauge);
 - fuel % ← 0x41/02 litres ÷ 45 L (Polo 6R tank).
 
-Outside temperature, battery voltage and odometer are decoded and shown in
-Diagnostics, but `VehicleState` has no field for them yet. Coolant temperature
+Outside temperature (0x41/02, or the `hcn.air.outdoor_temp` broadcast) and the
+odometer feed the dash; OBD's ambient PID wins over them. Battery voltage is
+decoded and shown in Diagnostics only. Coolant temperature
 is not in any frame this decoder reads.
 
 Diagnostics → Vehicle sources shows the HCN row, what has been decoded, and the

@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -58,11 +59,24 @@ public class HomeActivity extends Activity implements Widgets.Host {
 
     private HomeLayout layout;
     private HomeEditor editor;
-    private int pageIndex;
+    /** The page showing; -1 until the first build picks the layout's start page. */
+    private int pageIndex = -1;
     private String editBaseSig;
 
     private final VehicleHub vehicle = VehicleHub.shared();
     private boolean vehicleOn;
+    private String vehicleKey;
+    /** The simulator can be switched on from adb while this screen shows. */
+    private final SharedPreferences.OnSharedPreferenceChangeListener simSwitch =
+            new SharedPreferences.OnSharedPreferenceChangeListener() {
+                @Override
+                public void onSharedPreferenceChanged(SharedPreferences p, String key) {
+                    if (!Prefs.SIM.equals(key)) return;
+                    rebuildIfChanged();
+                    UnplugMonitor.shared().sync(HomeActivity.this);
+                    showBanners();
+                }
+            };
     private final VehicleState.Listener vehicleListener = new VehicleState.Listener() {
         @Override
         public void onVehicleState(VehicleState state) {
@@ -110,6 +124,10 @@ public class HomeActivity extends Activity implements Widgets.Host {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        // Home pressed while already on the home screen: back to the start page.
+        if (intent != null && intent.hasCategory(Intent.CATEGORY_HOME) && editor == null && hasWindowFocus()) {
+            goToPage(layout.start);
+        }
         if (intent != null && intent.getBooleanExtra(EXTRA_EDIT, false)) {
             intent.removeExtra(EXTRA_EDIT);
             enterEdit();
@@ -135,6 +153,12 @@ public class HomeActivity extends Activity implements Widgets.Host {
                 widgets.lastKph = kph;
                 widgets.lastFix = hasFix;
                 widgets.refresh(Widgets.SPEED);
+            }
+
+            @Override
+            public void onHeading(float degrees) {
+                widgets.heading = degrees;
+                widgets.refresh(Widgets.HEADING);
             }
 
             @Override
@@ -175,6 +199,15 @@ public class HomeActivity extends Activity implements Widgets.Host {
             }
         });
         syncVehicle();
+        UnplugMonitor.shared().setListener(new Runnable() {
+            @Override
+            public void run() {
+                showBanners();
+            }
+        });
+        UnplugMonitor.shared().sync(this);
+        showBanners();
+        Prefs.watch(this, simSwitch, true);
 
         // A setting, the wallpaper, or the set of installed apps may
         // have changed while we were away.
@@ -185,6 +218,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
             @Override
             public void run() {
                 rebuildIfChanged();
+                UnplugMonitor.shared().sync(HomeActivity.this);
             }
         });
         // ...and the wallpaper's colours can land after we have already
@@ -215,14 +249,29 @@ public class HomeActivity extends Activity implements Widgets.Host {
     /** The vehicle sources only run while something on the home screen shows them. */
     private void syncVehicle() {
         boolean want = Prefs.showVehicle(this) && layout != null
-                && (layout.hasItem(Kind.VEHICLE) || layout.hasItem(Kind.DOORS) || layout.hasItem(Kind.CHIPS));
-        if (want && !vehicleOn) {
-            vehicle.start(this, vehicleListener, Prefs.vehicleMode(this));
+                && (layout.hasItem(Kind.VEHICLE) || layout.hasItem(Kind.DOORS) || layout.hasItem(Kind.CHIPS)
+                || anyClassicPage());
+        String key = Prefs.sourceMode(this) + '|' + Prefs.obdAddress(this);
+        if (vehicleKey != null && !key.startsWith(vehicleKey.substring(0, vehicleKey.indexOf('|') + 1))) {
+            // Another kind of source: what the old one said no longer holds.
+            widgets.lastVehicle = null;
+            widgets.lastFix = false;
+            widgets.refresh(Widgets.VEH | Widgets.SPEED);
+        }
+        boolean changed = !key.equals(vehicleKey);
+        vehicleKey = key;
+        if (want && (!vehicleOn || changed)) {
+            vehicle.start(this, vehicleListener, Prefs.sourceMode(this));
             vehicleOn = true;
         } else if (!want && vehicleOn) {
             vehicle.stop(vehicleListener);
             vehicleOn = false;
         }
+    }
+
+    private boolean anyClassicPage() {
+        for (HomeLayout.Page p : layout.pages) if (p.classic(Prefs.carTheme(this))) return true;
+        return false;
     }
 
     /** Once, tell people the screen is editable — nothing on it says so otherwise. */
@@ -255,6 +304,8 @@ public class HomeActivity extends Activity implements Widgets.Host {
         themeWatch = null;
         vehicle.stop(vehicleListener);
         vehicleOn = false;
+        UnplugMonitor.shared().setListener(null);
+        Prefs.watch(this, simSwitch, false);
         if (nowPlaying != null) nowPlaying.stop();
         if (speed != null) speed.stop();
         trip.setListener(null);
@@ -306,6 +357,7 @@ public class HomeActivity extends Activity implements Widgets.Host {
             // Same working copy, new colours.
             editor = new HomeEditor(this, m3, editor.working, editor.originalJson());
         }
+        if (pageIndex < 0) pageIndex = layout.start;
         pageIndex = Math.max(0, Math.min(pageIndex, layout.pages.size() - 1));
 
         FrameLayout page = new FrameLayout(this);
@@ -316,6 +368,10 @@ public class HomeActivity extends Activity implements Widgets.Host {
         List<View> pages = new ArrayList<>();
         final boolean editing = editor != null;
         for (HomeLayout.Page p : layout.pages) {
+            if (p.classic(Prefs.carTheme(this))) {
+                pages.add(widgets.classicCluster(editing));
+                continue;
+            }
             GridPage gp = new GridPage(this, m3, layout, p, new GridPage.Factory() {
                 @Override
                 public View create(HomeLayout.Item it, int w, int h, int appIdx, boolean ed) {
@@ -365,6 +421,42 @@ public class HomeActivity extends Activity implements Widgets.Host {
         }
         widgets.refresh(Widgets.CLOCK | Widgets.NP | Widgets.WX | Widgets.VEH | Widgets.TRIP | Widgets.SPEED);
         syncVehicle();
+        showBanners();   // in the new colours
+    }
+
+    // ---- banners ----------------------------------------------------------------
+
+    private View unplugBanner, simBadge;
+
+    /** Notices that sit over whichever page is showing. */
+    private void showBanners() {
+        boolean unplug = UnplugMonitor.shared().showing();
+        if (unplugBanner != null) {
+            shell.removeView(unplugBanner);
+            unplugBanner = null;
+        }
+        if (simBadge != null) {
+            shell.removeView(simBadge);
+            simBadge = null;
+        }
+        if (Prefs.simulating(this)) {
+            simBadge = Banners.simulated(this);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            shell.addView(simBadge, lp);
+        }
+        if (unplug) {
+            unplugBanner = Banners.unplug(this, m3, new Runnable() {
+                @Override
+                public void run() {
+                    UnplugMonitor.shared().dismiss();
+                }
+            });
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            lp.topMargin = Math.round((Prefs.simulating(this) ? 34 : 14) * density);
+            shell.addView(unplugBanner, lp);
+        }
     }
 
     // ---- edit mode --------------------------------------------------------------

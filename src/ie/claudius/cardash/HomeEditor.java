@@ -3,6 +3,7 @@ package ie.claudius.cardash;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -81,6 +82,9 @@ final class HomeEditor implements GridPage.Edit {
         bar.addView(text(">", false, new Runnable() {
             @Override public void run() { act.goToPage(act.pageIndex() + 1); label(); }
         }));
+        bar.addView(text(act.getString(R.string.edit_style), false, new Runnable() {
+            @Override public void run() { stylePicker(); }
+        }));
         bar.addView(text(act.getString(R.string.edit_page_add), false, new Runnable() {
             @Override public void run() { addPage(); }
         }));
@@ -94,7 +98,11 @@ final class HomeEditor implements GridPage.Edit {
             @Override public void run() { act.exitEdit(true); }
         }));
         label();
-        return bar;
+        // A narrow screen scrolls the toolbar instead of cutting "Done" off.
+        HorizontalScrollView scroll = new HorizontalScrollView(act);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.addView(bar);
+        return scroll;
     }
 
     void label() {
@@ -189,7 +197,8 @@ final class HomeEditor implements GridPage.Edit {
                     }
                 });
             } else {
-                pop.stepper(o.label, it.getInt(o.key, Integer.parseInt(o.def)), o.min, o.max, o.step,
+                int step = Kind.VEHICLE.equals(it.type) ? Kind.vehicleStep(it.get("field", "coolant")) : o.step;
+                pop.stepper(o.label, it.getInt(o.key, Integer.parseInt(o.def)), o.min, o.max, step,
                         new Pop.Count() {
                             @Override public void on(int v) { it.settings.put(o.key, String.valueOf(v)); }
                         });
@@ -215,7 +224,7 @@ final class HomeEditor implements GridPage.Edit {
         for (Kind k : Kind.all()) {
             if (Kind.APP.equals(k.id)) continue;
             if (Kind.VEHICLE.equals(k.id)) {
-                for (String f : new String[] { "coolant", "fuel", "rpm", "speed" }) {
+                for (String f : new String[] { "coolant", "fuel", "rpm", "speed", "outside" }) {
                     entries.add(new Entry(Kind.vehicleLabel(f), k.id, f));
                 }
             } else {
@@ -243,7 +252,15 @@ final class HomeEditor implements GridPage.Edit {
         pop.show();
     }
 
+    /** A classic cluster page shows no widgets, so nothing is added to it unseen. */
+    private boolean classicPage() {
+        if (!page().classic(Prefs.carTheme(act))) return false;
+        Toast.makeText(act, R.string.classic_edit_note, Toast.LENGTH_LONG).show();
+        return true;
+    }
+
     private void add(Entry e) {
+        if (classicPage()) return;
         if (Kind.APP.equals(e.kind)) {
             act.pickApp(null);   // the result adds the tile
             return;
@@ -271,6 +288,31 @@ final class HomeEditor implements GridPage.Edit {
 
     // ---- pages -------------------------------------------------------------------------
 
+    /** How this page looks: its widgets, or the classic cluster screen. */
+    private void stylePicker() {
+        final HomeLayout.Page p = page();
+        String current = p.classic(Prefs.carTheme(act)) ? HomeLayout.CLASSIC : HomeLayout.MODERN;
+        final Pop pop = new Pop(act, m3, act.getString(R.string.edit_style_title));
+        pop.row(mark(act.getString(R.string.s_car_theme_modern), HomeLayout.MODERN.equals(current)),
+                style(p, HomeLayout.MODERN));
+        pop.row(mark(act.getString(R.string.s_car_theme_classic), HomeLayout.CLASSIC.equals(current)),
+                style(p, HomeLayout.CLASSIC));
+        pop.button(act.getString(android.R.string.cancel), null, false).show();
+    }
+
+    private static String mark(String s, boolean selected) {
+        return selected ? s + "  ✓" : s;
+    }
+
+    private Runnable style(final HomeLayout.Page p, final String theme) {
+        return new Runnable() {
+            @Override public void run() {
+                p.theme = theme;
+                act.rebuildEditing();
+            }
+        };
+    }
+
     private void addPage() {
         if (working.pages.size() >= HomeLayout.MAX_PAGES) {
             Toast.makeText(act, R.string.edit_no_room, Toast.LENGTH_SHORT).show();
@@ -281,7 +323,7 @@ final class HomeEditor implements GridPage.Edit {
                     @Override public void run() { insertPage(new HomeLayout.Page()); }
                 })
                 .row(act.getString(R.string.edit_page_vehicle), new Runnable() {
-                    @Override public void run() { insertPage(LayoutStore.vehiclePage(act)); }
+                    @Override public void run() { insertPage(LayoutStore.carPage(act)); }
                 })
                 .button(act.getString(android.R.string.cancel), null, false)
                 .show();
@@ -289,7 +331,7 @@ final class HomeEditor implements GridPage.Edit {
 
     private void insertPage(HomeLayout.Page p) {
         int at = Math.min(act.pageIndex() + 1, working.pages.size());
-        working.pages.add(at, p);
+        working.insertPage(at, p);
         act.setPageIndex(at);
         act.rebuildEditing();
     }
@@ -310,7 +352,7 @@ final class HomeEditor implements GridPage.Edit {
                 new Runnable() {
                     @Override public void run() {
                         int at = act.pageIndex();
-                        working.pages.remove(at);
+                        working.removePage(at);
                         act.setPageIndex(Math.max(0, at - 1));
                         act.rebuildEditing();
                     }
@@ -326,7 +368,8 @@ final class HomeEditor implements GridPage.Edit {
                         working.pages.addAll(fresh.pages);
                         working.cols = fresh.cols;
                         working.rows = fresh.rows;
-                        act.setPageIndex(0);
+                        working.start = fresh.start;
+                        act.setPageIndex(fresh.start);
                         act.rebuildEditing();
                     }
                 });
