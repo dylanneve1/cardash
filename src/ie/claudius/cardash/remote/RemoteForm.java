@@ -12,6 +12,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import ie.claudius.cardash.vehicle.SimVehicle;
+
 /**
  * The phone settings page (issue #1): everything except the socket.
  *
@@ -80,6 +82,11 @@ public final class RemoteForm {
                     "full", "Full", "compact", "Compact", "hide", "Hide"),
             new Option("vehicle", "auto", "Vehicle data", true,
                     "auto", "Auto", "obd", "OBD", "can", "CAN", "off", "Off"),
+            new Option("car_theme", "modern", "Car page style", false,
+                    "modern", "Modern", "classic", "Classic VW"),
+            new Option("car_body", "auto", "Car body", false,
+                    "auto", "Auto", "3door", "3-door", "5door", "5-door", "estate", "Estate", "saloon", "Saloon"),
+            new Option("unplug", "on", "Unplug reminder", false, "on", "On", "off", "Off"),
             new Option("speed_unit", "kmh", "Speed", false, "kmh", "km/h", "mph", "mph"),
             new Option("temp_unit", "c", "Temperature", false, "c", "°C", "f", "°F"),
             new Option("clock", "system", "Clock", false,
@@ -103,6 +110,12 @@ public final class RemoteForm {
         /** Launchable apps as {package, label}, sorted by label: the only
          *  values a tile may be set to (besides empty). */
         List<String[]> apps();
+
+        /** The simulated vehicle's values while it is on (switched on in Diagnostics), else null. */
+        Map<String, String> sim();
+
+        /** Change the simulated vehicle. */
+        void simApply(Map<String, String> changes);
     }
 
     // ---- tiles -------------------------------------------------------------------
@@ -321,6 +334,11 @@ public final class RemoteForm {
                 failures++;
                 return redirect("/?wrong=1", "");
             }
+            if (r.path.equals("/sim") && r.method.equals("POST")) {
+                if (!paired) return redirect("/", "");
+                if (store.sim() != null) store.simApply(simChanges(r.form));
+                return redirect("/?sim=1", "");
+            }
             if (!r.path.equals("/")) return response(404, "Not Found", "", page("Not found", ""));
             if (!paired) return response(200, "OK", "", loginPage(r.query.containsKey("wrong")));
             if (r.method.equals("POST")) {
@@ -328,7 +346,8 @@ public final class RemoteForm {
                 if (!ch.isEmpty()) store.apply(ch);
                 return redirect("/?saved=1", "");
             }
-            return response(200, "OK", "", settingsPage(store, r.query.containsKey("saved")));
+            return response(200, "OK", "",
+                    settingsPage(store, r.query.containsKey("saved"), r.query.containsKey("sim")));
         }
 
         private boolean paired(String t) {
@@ -383,6 +402,8 @@ public final class RemoteForm {
             + "label.tile{display:block;margin:10px 0 6px;color:#c4c6d0}"
             + "select{width:100%;min-height:52px;border:0;border-radius:16px;padding:0 14px;"
             + "background:#2e3136;color:#e2e2e9;font:inherit;margin:0 0 4px}"
+            + "input[type=range]{width:100%;min-height:40px;accent-color:#aac7ff}"
+            + "button[name=action]{margin:0 0 10px}"
             + "p{color:#c4c6d0}.ok{color:#9dd49a}.err{color:#ffb4ab}";
 
     static String page(String title, String body) {
@@ -413,7 +434,7 @@ public final class RemoteForm {
         sb.append("<section><fieldset><legend>Tiles</legend>")
                 .append("<p>In order: left to right, top to bottom")
                 .append(hero ? "; tile 1 is the wide one" : "")
-                .append(". Long-pressing a tile on the dash does the same.</p>");
+                .append(". On the dash, long-press to edit, then the gear on a tile does the same.</p>");
         for (int i = 0; i < n; i++) {
             String cur = store.get(TILE + i, null);
             if (cur == null) cur = "";
@@ -440,9 +461,60 @@ public final class RemoteForm {
         sb.append("</fieldset></section>");
     }
 
-    static String settingsPage(Store store, boolean saved) {
+    /** What the simulator form asks for: one of its buttons, or every slider and switch. */
+    static Map<String, String> simChanges(Map<String, String> form) {
+        Map<String, String> out = new LinkedHashMap<>();
+        String action = form.get("action");
+        if ("cycle".equals(action)) {
+            out.put("cycle", "1");
+        } else if ("stop".equals(action)) {
+            out.put("cycle", "0");
+        } else if ("reset".equals(action)) {
+            out.put("reset", "1");
+        } else if ("apply".equals(action)) {
+            for (String[] n : SimVehicle.NUMBERS) if (form.get(n[0]) != null) out.put(n[0], form.get(n[0]));
+            // An unticked checkbox sends nothing: on this form that means off.
+            for (String[] s : SimVehicle.SWITCHES) out.put(s[0], form.get(s[0]) == null ? "0" : "1");
+        }
+        return out;
+    }
+
+    /** Sliders and switches for the simulated vehicle, shown only while it is on. */
+    static void simulator(Map<String, String> now, StringBuilder sb) {
+        sb.append("<form method=post action=/sim><section><fieldset><legend>Simulated vehicle</legend>")
+                .append("<p>The dash is showing made-up data. Switch it off in Diagnostics on the head unit.</p>");
+        for (String[] n : SimVehicle.NUMBERS) {
+            String v = now.get(n[0]);
+            if (v == null) v = n[5];
+            sb.append("<label class=tile for=s_").append(n[0]).append('>').append(esc(n[1]))
+                    .append(": <output>").append(esc(v)).append("</output></label>")
+                    .append("<input type=range name=").append(n[0]).append(" id=s_").append(n[0])
+                    .append(" min=").append(n[2]).append(" max=").append(n[3]).append(" step=").append(n[4])
+                    .append(" value=\"").append(esc(v)).append("\" oninput=\"")
+                    .append("this.previousElementSibling.firstElementChild.value=this.value\">");
+        }
+        sb.append("<div class=seg>");
+        for (String[] s : SimVehicle.SWITCHES) {
+            sb.append("<input type=checkbox name=").append(s[0]).append(" id=s_").append(s[0]).append(" value=1")
+                    .append("1".equals(now.get(s[0])) ? " checked" : "")
+                    .append("><label for=s_").append(s[0]).append('>').append(esc(s[1])).append("</label>");
+        }
+        sb.append("</div></fieldset></section>")
+                .append("<button name=action value=apply>Apply</button>")
+                .append("<button name=action value=cycle>Play drive cycle</button>")
+                .append("<button name=action value=stop>Stop drive cycle</button>")
+                .append("<button name=action value=reset>Reset values</button></form>");
+    }
+
+    static String settingsPage(Store store, boolean saved, boolean simmed) {
         StringBuilder sb = new StringBuilder();
         if (saved) sb.append("<p class=ok>Saved. The dash updates right away.</p>");
+        Map<String, String> sim = store.sim();
+        // At the top while simulating: it is what the page was opened for.
+        if (sim != null) {
+            if (simmed) sb.append("<p class=ok>Simulator updated.</p>");
+            simulator(sim, sb);
+        }
         sb.append("<form method=post action=/><section>");
         // Dash widgets first: they are what people want to change most.
         sb.append("<fieldset><legend>Dash</legend><div class=seg>")

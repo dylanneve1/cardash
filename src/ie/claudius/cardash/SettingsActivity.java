@@ -13,8 +13,12 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import ie.claudius.cardash.bt.BluetoothActivity;
+import ie.claudius.cardash.car.CarProfile;
+import ie.claudius.cardash.car.Vin;
 import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.diag.DiagnosticsActivity;
+import ie.claudius.cardash.layout.HomeLayout;
 import ie.claudius.cardash.remote.QrView;
 import ie.claudius.cardash.remote.RemoteServer;
 
@@ -123,8 +127,33 @@ public class SettingsActivity extends Activity {
         header.addView(done);
         column.addView(header);
 
-        // ---- appearance ----
+        // ---- home screen layout ----
         LinearLayout card = card();
+        card.addView(actionRow(R.string.s_home, R.string.s_home_caption, R.string.s_home_edit,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        Intent i = new Intent(SettingsActivity.this, HomeActivity.class);
+                        i.putExtra(HomeActivity.EXTRA_EDIT, true);
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        startActivity(i);
+                        finish();
+                    }
+                }));
+        card.addView(divider());
+        card.addView(sideRow());
+        card.addView(divider());
+        card.addView(actionRow(R.string.s_home_reset, R.string.s_home_reset_caption, R.string.s_reset_action,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        LayoutStore.reset(SettingsActivity.this);
+                    }
+                }));
+        column.addView(card, cardParams(0));
+
+        // ---- appearance ----
+        card = card();
         if (Wallpapers.supported(this)) {
             card.addView(wallpaperRow());
             card.addView(divider());
@@ -143,7 +172,7 @@ public class SettingsActivity extends Activity {
         card.addView(row(R.string.s_motion, R.string.s_motion_caption, Prefs.MOTION, "expressive",
                 new String[] { "expressive", "calm" },
                 new int[] { R.string.s_motion_expressive, R.string.s_motion_calm }, false));
-        column.addView(card, cardParams(0));
+        column.addView(card, cardParams(dp(16)));
 
         // ---- widgets ----
         card = card();
@@ -184,6 +213,22 @@ public class SettingsActivity extends Activity {
                 }));
         column.addView(card, cardParams(dp(16)));
 
+        // ---- the car ----
+        card = card();
+        card.addView(carThemeRow());
+        card.addView(divider());
+        card.addView(carRow(R.string.s_car_make, Prefs.CAR_MAKE));
+        card.addView(divider());
+        card.addView(carRow(R.string.s_car_model, Prefs.CAR_MODEL));
+        card.addView(divider());
+        card.addView(row(R.string.s_car_body, R.string.s_car_body_caption, Prefs.CAR_BODY, CarProfile.AUTO,
+                CarProfile.BODIES, new int[] { R.string.s_vehicle_auto, R.string.s_car_3door,
+                        R.string.s_car_5door, R.string.s_car_estate, R.string.s_car_saloon }, false));
+        card.addView(divider());
+        card.addView(row(R.string.s_unplug, R.string.s_unplug_caption, Prefs.UNPLUG, "on",
+                new String[] { "on", "off" }, new int[] { R.string.s_on, R.string.s_off }, false));
+        column.addView(card, cardParams(dp(16)));
+
         // ---- units ----
         card = card();
         card.addView(row(R.string.s_speed, R.string.s_speed_caption, Prefs.SPEED, "kmh",
@@ -215,6 +260,9 @@ public class SettingsActivity extends Activity {
                 }));
         card.addView(divider());
         card.addView(remoteRow());
+        card.addView(divider());
+        card.addView(linkRow(R.string.s_bt, R.string.s_bt_caption, R.string.s_diag_open,
+                new Intent(this, BluetoothActivity.class)));
         card.addView(divider());
         card.addView(linkRow(R.string.s_diag, R.string.s_diag_caption, R.string.s_diag_open,
                 new Intent(this, DiagnosticsActivity.class)));
@@ -248,10 +296,39 @@ public class SettingsActivity extends Activity {
                     if (value.equals(Prefs.get(SettingsActivity.this, key, def))) return;
                     Prefs.set(SettingsActivity.this, key, value);
                     handTuned();
+                    // The hero/grid tile shape is a property of the default layout: choosing it replaces a custom one.
+                    if (Prefs.LAYOUT.equals(key)) LayoutStore.reset(SettingsActivity.this);
                     if (rethemes || Prefs.MOTION.equals(key)) {
                         rebuild(false);
                         return;
                     }
+                    for (int j = 0; j < group.getChildCount(); j++) {
+                        TextView o = (TextView) group.getChildAt(j);
+                        style(o, o == opt);
+                    }
+                    Motion.pop(opt);
+                }
+            });
+            group.addView(opt);
+        }
+        row.addView(group);
+        return row;
+    }
+
+    /** Steering wheel side. Not a plain pref: switching mirrors the saved layout. */
+    private View sideRow() {
+        LinearLayout row = rowShell(R.string.s_side, R.string.s_side_caption);
+        final LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.HORIZONTAL);
+        final boolean rhd = Prefs.rightHandDrive(this);
+        int[] labels = { R.string.s_side_lhd, R.string.s_side_rhd };
+        for (int i = 0; i < 2; i++) {
+            final boolean right = i == 1;
+            final TextView opt = pill(getString(labels[i]), right == rhd);
+            opt.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    LayoutStore.setSide(SettingsActivity.this, right);
                     for (int j = 0; j < group.getChildCount(); j++) {
                         TextView o = (TextView) group.getChildAt(j);
                         style(o, o == opt);
@@ -470,6 +547,70 @@ public class SettingsActivity extends Activity {
         }
         row.addView(hs);
         return row;
+    }
+
+    /** Not a plain pref: choosing also brings a saved layout's car pages back in line. */
+    private View carThemeRow() {
+        LinearLayout row = rowShell(R.string.s_car_theme, R.string.s_car_theme_caption);
+        final LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.HORIZONTAL);
+        final String[] values = { HomeLayout.MODERN, HomeLayout.CLASSIC };
+        int[] labels = { R.string.s_car_theme_modern, R.string.s_car_theme_classic };
+        for (int i = 0; i < values.length; i++) {
+            final String value = values[i];
+            final TextView opt = pill(getString(labels[i]), value.equals(Prefs.carTheme(this)));
+            opt.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    LayoutStore.setCarTheme(SettingsActivity.this, value);
+                    for (int j = 0; j < group.getChildCount(); j++) {
+                        TextView o = (TextView) group.getChildAt(j);
+                        style(o, o == opt);
+                    }
+                    Motion.pop(opt);
+                }
+            });
+            group.addView(opt);
+        }
+        row.addView(group);
+        return row;
+    }
+
+    /** Make or model: from the VIN unless chosen here. */
+    private View carRow(final int titleRes, final String key) {
+        final boolean isMake = Prefs.CAR_MAKE.equals(key);
+        LinearLayout row = rowShell(titleRes, R.string.s_car_unknown);
+        TextView caption = (TextView) ((ViewGroup) row.getChildAt(0)).getChildAt(1);
+        final CarProfile car = Prefs.carProfile(this);
+        String shown = isMake ? car.make : car.model;
+        if (shown != null) {
+            caption.setText(getString(Prefs.get(this, key, "").isEmpty()
+                    ? R.string.s_car_from_vin : R.string.s_car_chosen, shown));
+        }
+        TextView button = pill(getString(R.string.s_car_choose), false);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Pop pop = new Pop(SettingsActivity.this, m3, getString(titleRes));
+                pop.row(getString(R.string.s_car_auto), chooseCar(key, ""));
+                for (String s : isMake ? Vin.makes() : Vin.modelsOf(car.make)) pop.row(s, chooseCar(key, s));
+                pop.button(getString(android.R.string.cancel), null, false).show();
+            }
+        });
+        row.addView(button);
+        return row;
+    }
+
+    private Runnable chooseCar(final String key, final String value) {
+        return new Runnable() {
+            @Override
+            public void run() {
+                Prefs.set(SettingsActivity.this, key, value);
+                // A model belongs to a make.
+                if (Prefs.CAR_MAKE.equals(key)) Prefs.set(SettingsActivity.this, Prefs.CAR_MODEL, "");
+                rebuild(false);
+            }
+        };
     }
 
     /** A row whose button opens another screen. */

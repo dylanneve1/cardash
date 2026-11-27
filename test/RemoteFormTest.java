@@ -33,6 +33,17 @@ public class RemoteFormTest {
             m.putAll(changes);
         }
 
+        Map<String, String> sim;
+        Map<String, String> simChanges;
+
+        public Map<String, String> sim() {
+            return sim;
+        }
+
+        public void simApply(Map<String, String> changes) {
+            simChanges = changes;
+        }
+
         public List<String[]> apps() {
             List<String[]> a = new ArrayList<>();
             a.add(new String[] { "com.example.maps", "Maps" });
@@ -160,6 +171,27 @@ public class RemoteFormTest {
         check("tile cleared", "".equals(store.m.get("tile_0")));
         s.handle(req(post("/", cookie, "tile_0=&tile_1=com.example.music")), store);
         check("tiles unchanged no apply", store.applies == before + 2);
+
+        // Simulator: on the page only while it is on, and only for a paired browser.
+        r = s.handle(req(get("/", cookie)), store);
+        check("no simulator section when off", !r.contains("action=/sim"));
+        s.handle(req(post("/sim", cookie, "action=cycle")), store);
+        check("sim post ignored when off", store.simChanges == null);
+        store.sim = new HashMap<>();
+        store.sim.put("rpm", "3000");
+        store.sim.put("door_fl", "1");
+        r = s.handle(req(get("/", cookie)), store);
+        check("sliders shown", r.contains("action=/sim") && r.contains("name=rpm id=s_rpm")
+                && r.contains("value=\"3000\"") && r.contains("id=s_door_fl value=1 checked"));
+        s.handle(req(post("/sim", null, "action=cycle")), store);
+        check("unpaired sim post ignored", store.simChanges == null);
+        r = s.handle(req(post("/sim", cookie, "action=apply&rpm=4000&coolant=115&door_rr=1&evil=1")), store);
+        check("sim redirect", r.contains("Location: /?sim=1"));
+        check("sim applied", "4000".equals(store.simChanges.get("rpm")) && "1".equals(store.simChanges.get("door_rr"))
+                && "0".equals(store.simChanges.get("door_fl")) && !store.simChanges.containsKey("evil"));
+        s.handle(req(post("/sim", cookie, "action=cycle&rpm=1")), store);
+        check("cycle button", store.simChanges.size() == 1 && "1".equals(store.simChanges.get("cycle")));
+        store.sim = null;
 
         // Lockout: five wrong codes and even the right one stops working.
         RemoteForm.Session t = new RemoteForm.Session(new SecureRandom());

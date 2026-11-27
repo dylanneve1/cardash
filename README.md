@@ -25,7 +25,7 @@ Aftermarket head units ship with launchers that look like 2012 and behave worse.
 - **Material You, generated on-device.** The whole palette is derived from your wallpaper — or from one of six bundled designs — so the clock, the gauge, the tiles and the controls all belong to one scheme. Works on Android 11, which never had dynamic colour.
 - **A dash column that's yours.** A GPS speedometer, a trip meter, and the weather. Show the ones you want, or none and let the app grid take the room.
 - **Now playing, without leaning over.** Whatever's playing — Bluetooth, Spotify, the radio app — appears under the clock with transport controls sized for a moving car.
-- **Car data when there's a source.** Fuel, coolant, RPM and open doors from an ELM327 dongle or the unit's own CAN box. Nothing is shown until something real reports.
+- **Car data when there's a source.** Fuel, coolant, RPM, temperatures and open doors from an ELM327 dongle or the unit's own CAN box. Nothing is shown until something real reports.
 - **Expressive motion, or none.** Springs, staggers and crossfades tuned to Material 3's curves — or a *Calm* mode that swaps every one of them for a short fade.
 - **Dark only.** A bright screen reflected in a windscreen at night is a hazard, not a preference.
 
@@ -64,6 +64,22 @@ Everything lives behind the gear next to *All apps*. Options are deliberately fe
   <img src="screenshots/10-wallpapers.png" alt="Bundled wallpapers" width="880">
 </p>
 
+
+## Make the home screen yours
+
+The home screen is a grid of cells (12 × 8 on a 1280×720 unit, worked out from the screen size) with any number of pages. It looks the way it always did until you change it.
+
+- **Edit:** long-press empty space or any widget (or the clock → *Edit home screen*, or *Settings → Home screen → Edit*, or *All apps → Edit home screen*).
+- **Move:** drag a widget; it snaps to cells and never lands on another one. **Resize:** drag the round handle in its bottom-right corner. **Settings of a widget:** the gear on it. **Remove:** the X. Everything is 48 dp or bigger.
+- **Add:** *Add* in the bar at the bottom: an app, clock, date, now playing, speedometer, trip, weather, a single vehicle value (coolant, fuel, rpm, speed) as a bar or a gauge with its own minimum, maximum and warning threshold (default coolant 0–120 °C, red from 110), door status, the all-apps button, the settings button, the vehicle strip.
+- **Pages:** swipe sideways between pages. In edit mode, *+ Page* adds an empty page or a ready-made vehicle page (three gauges, doors, speed bar); *Delete page* removes one.
+- **Done** keeps the changes, **Cancel** throws them away, **Default** goes back to the original layout.
+- **All apps:** swipe up from anywhere on the home screen (or add the all-apps button).
+- **Never locked out:** the bar's gear opens Settings in edit mode; long-pressing the clock opens a menu with Settings; the all-apps screen has Settings and *Edit home screen* buttons.
+- **Left- or right-hand drive:** *Settings → Steering wheel* mirrors the layout so the clock side is next to the driver.
+
+The layout is stored as JSON in the app's preferences (`home_layout`); the model and its tests are plain Java in `layout/` (`./test.sh`).
+
 ## Hardware
 
 Built for a Jancar / Rockchip RK3326 unit — Android 11, 32-bit — and kept honest about it:
@@ -75,10 +91,37 @@ Built for a Jancar / Rockchip RK3326 unit — Android 11, 32-bit — and kept ho
 | Data source | Hardware | Gives you |
 |---|---|---|
 | GPS | The unit's own receiver | Speed, trip distance, position for weather |
-| `ObdSource` | ELM327 Bluetooth dongle | RPM, speed, coolant, fuel level |
+| `ObdSource` | ELM327 Bluetooth dongle | RPM, speed, coolant; fuel level and outside (or intake) air temperature where the car has the PID; VIN |
 | `JancarSource` | CAN box on the harness | Doors, boot, handbrake, reverse, fuel |
+| `HcnSource` | HCN head units (`com.hcn.autocan`) | Doors, handbrake, fuel, outside temperature, odometer (see [docs/hcn.md](docs/hcn.md)) |
+| `HcnSource` | HCN head units (`com.hcn.autocan`), Raise box | Doors, boot; handbrake, RPM, fuel if the vendor service passes frames on ([docs/hcn.md](docs/hcn.md)) — untested on a car |
 
-OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where both report a field, the CAN box wins. When OBD reports speed, the gauge prefers it over GPS (no lag under braking, no tunnel dropout). Fuel is remembered across restarts; doors are not.
+OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where several sources report a field, the OBD dongle wins and the CAN box fills in what it lacks (fuel, for instance). When OBD reports speed, the gauge prefers it over GPS (no lag under braking, no tunnel dropout). Fuel is remembered across restarts; doors are not. A value nobody reports shows a dash, or *Unavailable* when the car says it has no such PID; engine OBD has no inside temperature at all.
+
+The OBD link is tuned for speed: supported PIDs are read once, on CAN several PIDs share one request, RPM and speed go in every cycle and slow values now and then. *Diagnostics* shows the measured requests per second.
+
+## Car pages
+
+A fresh install has three pages: **car information** (RPM, speed, coolant, fuel, outside temperature round a top-down car whose doors swing open), the **home** page where it starts, and **useful information** (clock, now playing, weather, trip). Swipe up for apps. A layout you have saved is never replaced; *Edit → Default* gets the new one.
+
+- **Style** — the car page comes as *Modern* widgets or a monochrome *Classic VW* cluster screen (heading and time, car, outside temperature, odometer and trip). Choose per page in edit mode, or in Settings.
+- **Car profile** — make, model and body (3-door, 5-door, estate, saloon). Make and model come from the VIN; the door count doesn't, so pick it.
+- **Warnings** — a value's box turns red past its limit (5500 rpm, 110 °C coolant; each widget's gear changes it).
+- **Unplug reminder** — with a dongle chosen, three minutes without the engine running raises a notification and a banner, once per stop.
+
+### Trying it without a car
+
+*Diagnostics → Simulated vehicle* replaces every source with made-up data (marked on screen). Drive it from the Phone settings page (sliders, switches, a repeating drive cycle) or from adb:
+
+```sh
+P=content://ie.claudius.cardash.diag
+adb shell content call --uri $P --method sim --arg "enable=1,rpm=3000,door_fl=1"
+adb shell content call --uri $P --method sim --arg "cycle=1"        # play a drive; cycle=0 stops it
+adb shell content call --uri $P --method sim --arg "fuel=na"        # a value the car doesn't have
+adb shell content call --uri $P --method sim --arg "enable=0"
+```
+
+Names: `rpm speed coolant fuel outside odometer door_fl door_fr door_rl door_rr boot bonnet handbrake reverse` (and `reset=1`).
 
 ## Phone settings
 
@@ -86,10 +129,11 @@ OBD-II has no PID for door state — that lives on the body bus — so doors nee
 
 ## Diagnostics
 
-Long-press the clock (or *Settings → Diagnostics*). It answers the questions you'd otherwise buy hardware to find out:
+Long-press the clock and choose *Diagnostics* (or *Settings → Diagnostics*). It answers the questions you'd otherwise buy hardware to find out:
 
 - **Unit** — build fingerprint, the *claimed* Android version beside the *actual* API level (vendors overstate it), ABIs, and every package that looks like car integration.
 - **Vendor service surface** — the receivers, services and providers those packages declare, with their intent actions, read from their own manifests. A **manifest sweep** of every installed package finds the car service wherever a ROM has renamed it.
+- **Launch activities** — every *exported* activity of every installed app, including the ones with no launcher icon (factory menus, canbox setup, `com.mediatek.engineermode`), on its own screen (grouped by app, with icons), a filter box and big tappable rows with a **Launch** button (explicit component, errors shown on the row, never a crash). Factory/engineer/modem/radio/RF/IMEI names and EngineerMode ask for confirmation first. Built for units with no adb: it is the one APK you need.
 - **Live broadcasts** — a sniffer armed on every action the sweep found, with each extra typed (`fuel=47 (Integer)`). Re-arms itself when discovery lands.
 - **Vehicle sources** — detected / started / last heard / fields known, per source: three failure modes that look identical on the home screen.
 - **OBD-II** — paired devices, which one matched, socket state, and the last raw reply per command, verbatim. Settles "this car has no fuel PID" versus "this clone dongle is lying".
@@ -124,13 +168,13 @@ Grab the APK from a [CI run](https://github.com/dylanneve1/cardash/actions) or b
 adb install -r cardash.apk
 ```
 
-Settings → Apps → Default apps → Home app. The stock launcher stays installed; switching back is the same two taps. Long-press any tile to reassign it.
+Settings → Apps → Default apps → Home app. The stock launcher stays installed; switching back is the same two taps. Long-press the home screen to edit it (tiles included).
 
 ## Build
 
 ```sh
 ./build.sh      # -> cardash.apk
-./test.sh       # plain-JVM tests: OBD parser, phone settings page, QR encoder
+./test.sh       # plain-JVM tests: OBD parser, HCN/Raise frames, phone settings page, QR encoder, Bluetooth device list
 ```
 
 Needs an Android SDK with build-tools 35.0.0+ and platform 34 (`ANDROID_SDK_ROOT` if it isn't in the default place). The script generates a debug keystore on first run; use your own for anything you hand to other people.

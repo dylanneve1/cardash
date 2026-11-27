@@ -42,6 +42,8 @@ import ie.claudius.cardash.Prefs;
 import ie.claudius.cardash.R;
 import ie.claudius.cardash.Receivers;
 import ie.claudius.cardash.Shapes;
+import ie.claudius.cardash.bt.BluetoothActivity;
+import ie.claudius.cardash.vehicle.HcnSource;
 import ie.claudius.cardash.vehicle.JancarSource;
 import ie.claudius.cardash.vehicle.ObdSource;
 import ie.claudius.cardash.vehicle.VehicleHub;
@@ -88,6 +90,10 @@ public class DiagnosticsActivity extends Activity {
     private String unitText = "", surfaceText = "", serialText = "", aaText = "";
     private TextView unitBody, surfaceBody, sniffBody, sourcesBody, obdBody, keysBody, serialBody, aaBody;
     private EditText protocolField;
+
+    private String targetsText = "";
+    /** Hardware/capability sections, filled once by the probe thread. */
+    private java.util.Map<String, String> deviceSections = new java.util.LinkedHashMap<>();
 
     private final Log sniff = new Log();
     private final Log keys = new Log();
@@ -206,13 +212,18 @@ public class DiagnosticsActivity extends Activity {
         surfaceBody = panel(column, R.string.diag_surface, R.string.diag_surface_caption, null);
         surfaceBody.setText(working);
 
+        launchEntry(column);
+
         sniffBody = panel(column, R.string.diag_sniffer, R.string.diag_sniffer_caption, sniff);
         sniff.body = sniffBody;
         sniff.idle = working;
         sniffBody.setText(working);
 
+        simulatorPanel(column);
+
         sourcesBody = panel(column, R.string.diag_sources, R.string.diag_sources_caption, null);
         obdBody = panel(column, R.string.diag_obd, R.string.diag_obd_caption, null);
+        bluetoothButton((LinearLayout) obdBody.getParent());
 
         keysBody = panel(column, R.string.diag_keys, R.string.diag_keys_caption, keys);
         keys.body = keysBody;
@@ -279,12 +290,26 @@ public class DiagnosticsActivity extends Activity {
                     }
                 });
 
+                final java.util.Map<String, String> device = DeviceReport.sections(ctx);
+                post(new Runnable() {
+                    public void run() {
+                        deviceSections = device;
+                    }
+                });
+
                 final List<Probe.Hit> hits = Probe.sweep(ctx);
                 Probe.rememberSweep(ctx, hits);
                 final List<String> all = Probe.merge(Probe.vendorPackages(ctx), hits);
                 final String unitFull = unitText(ctx, all, hits.size());
                 final String surface = surfaceText(ctx, all);
                 final Set<String> actions = watchList(ctx, all);
+                final List<ActivityTargets.Target> exported = Probe.exportedActivities(ctx, null);
+                final String exportedText = Probe.activitiesText(exported);
+                post(new Runnable() {
+                    public void run() {
+                        targetsText = exportedText;
+                    }
+                });
                 post(new Runnable() {
                     public void run() {
                         vendorPkgs = all;
@@ -311,7 +336,7 @@ public class DiagnosticsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        hub.start(this, hubListener, VehicleHub.MODE_AUTO);
+        hub.start(this, hubListener, Prefs.diagMode(this));
         if (sniffer == null && !sniffActions.isEmpty()) resniff(sniffActions);
         main.post(refresh);
     }
@@ -416,6 +441,7 @@ public class DiagnosticsActivity extends Activity {
     private String sourcesText() {
         StringBuilder sb = new StringBuilder();
         long now = System.currentTimeMillis();
+        if (Prefs.simulating(this)) sb.append("SIMULATED VEHICLE: the values below are not from a car\n\n");
         for (VehicleHub.Entry e : hub.entries()) {
             sb.append(e.source.name()).append('\n');
             sb.append("    available  ").append(e.available ? "yes" : "no").append('\n');
@@ -427,15 +453,34 @@ public class DiagnosticsActivity extends Activity {
                     : ((now - e.lastUpdate) / 1000) + " s ago").append('\n');
             sb.append("    fields     ").append(e.knownFields).append(" of ")
                     .append(VehicleState.FIELDS).append(" known\n");
+            if (e.source instanceof HcnSource) sb.append(hcnText((HcnSource) e.source));
         }
         if (hub.entries().isEmpty()) sb.append("(hub not running)\n");
         VehicleState m = hub.merged();
         sb.append("\nmerged: fuel=").append(v(m.fuelPercent)).append("  speed=").append(v(m.speedKph))
                 .append("  rpm=").append(v(m.rpm)).append("  coolant=").append(v(m.coolantC))
+                .append("\n        outside=").append(v(m.outsideC)).append("  intake=").append(v(m.intakeC))
+                .append("  odometer=").append(v(m.odometerKm))
+                .append("\n        inside temperature: not available over engine OBD")
                 .append("\n        doors FL=").append(m.doorFrontLeft).append(" FR=").append(m.doorFrontRight)
                 .append(" RL=").append(m.doorRearLeft).append(" RR=").append(m.doorRearRight)
-                .append(" boot=").append(m.boot).append("\n        handbrake=").append(m.handbrake)
+                .append(" boot=").append(m.boot)
+                .append(" bonnet=").append(m.bonnet).append("\n        handbrake=").append(m.handbrake)
                 .append(" reverse=").append(m.reverse).append('\n');
+        return sb.toString();
+    }
+
+    /**
+     * HCN: what the frames decoded to, then the last raw callback
+     * payloads and property changes, verbatim. On the car this is what
+     * settles whether a bit means what docs/hcn.md says it means.
+     */
+    static String hcnText(HcnSource h) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("    decoded    ").append(h.decoded().replace("\n", "\n               ")).append('\n');
+        List<String> raw = h.recentPayloads();
+        sb.append("    raw log (").append(raw.size()).append(", newest last)\n");
+        for (String r : raw) sb.append("      ").append(r).append('\n');
         return sb.toString();
     }
 
@@ -448,16 +493,19 @@ public class DiagnosticsActivity extends Activity {
         ObdSource.Diag d = obd.diag();
         StringBuilder sb = new StringBuilder();
         sb.append("paired devices (").append(d.paired.size()).append("):\n");
-        for (String p : d.paired) sb.append("  ").append(p).append('\n');
+        for (String p : d.paired) sb.append("  ").append(p).append('\n'); // masked in report()
+        sb.append("chosen dongle: ")
+                .append(d.chosen == null ? "none (matching paired devices by name)" : d.chosen).append('\n');
         sb.append("matched as dongle: ").append(d.matched == null ? "none" : d.matched).append('\n');
         sb.append("socket: ").append(d.socket).append('\n');
+        sb.append(ObdText.link(d));
         if (!d.raw.isEmpty()) {
             sb.append("\nlast raw reply per command:\n");
             for (Map.Entry<String, String> e : d.raw.entrySet()) {
                 sb.append(String.format(Locale.US, "  %-6s %s%n", e.getKey(), e.getValue()));
             }
         }
-        return sb.toString();
+        return ExportText.maskText(sb.toString());
     }
 
     private void renderSources() {
@@ -466,6 +514,69 @@ public class DiagnosticsActivity extends Activity {
 
     private void renderObd() {
         if (obdBody != null) obdBody.setText(obdText());
+    }
+
+    // ---- launch any exported activity: its own screen --------------------------------
+
+    private void launchEntry(LinearLayout column) {
+        LinearLayout card = cardShell(column, R.string.diag_launch, R.string.diag_launch_caption, null);
+        TextView open = pill(getString(R.string.diag_launch_open), true, new Runnable() {
+            @Override
+            public void run() {
+                startActivity(new Intent(DiagnosticsActivity.this, ActivityLauncherActivity.class));
+            }
+        });
+        open.setMinHeight(dp(56));
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) open.getLayoutParams();
+        lp.topMargin = dp(12);
+        lp.leftMargin = 0;
+        card.addView(open, lp);
+    }
+
+    /** From the OBD panel to the screen that pairs and picks the dongle. */
+    private void bluetoothButton(LinearLayout card) {
+        TextView open = pill(getString(R.string.diag_bt_open), true, new Runnable() {
+            @Override
+            public void run() {
+                startActivity(new Intent(DiagnosticsActivity.this, BluetoothActivity.class));
+            }
+        });
+        open.setMinHeight(dp(56));
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) open.getLayoutParams();
+        lp.topMargin = dp(12);
+        lp.leftMargin = 0;
+        card.addView(open, 1, lp);
+    }
+
+    // ---- the simulated vehicle -------------------------------------------------------
+
+    private void simulatorPanel(LinearLayout column) {
+        LinearLayout card = cardShell(column, R.string.diag_sim, R.string.diag_sim_caption, null);
+        final TextView toggle = pill("", false, null);
+        final Runnable label = new Runnable() {
+            @Override
+            public void run() {
+                toggle.setText(Prefs.simulating(DiagnosticsActivity.this)
+                        ? R.string.diag_sim_stop : R.string.diag_sim_start);
+            }
+        };
+        toggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean on = !Prefs.simulating(DiagnosticsActivity.this);
+                Prefs.set(DiagnosticsActivity.this, Prefs.SIM, on ? "on" : "off");
+                hub.start(DiagnosticsActivity.this, hubListener, Prefs.diagMode(DiagnosticsActivity.this));
+                label.run();
+                renderSources();
+                renderObd();
+            }
+        });
+        label.run();
+        toggle.setMinHeight(dp(56));
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) toggle.getLayoutParams();
+        lp.topMargin = dp(12);
+        lp.leftMargin = 0;
+        card.addView(toggle, lp);
     }
 
     // ---- the one fact that can't be probed ------------------------------------------
@@ -525,6 +636,8 @@ public class DiagnosticsActivity extends Activity {
         section(sb, "FACTORY-SETTINGS CANBOX PROTOCOL LIST (typed in by hand)",
                 protocols.isEmpty() ? "(not recorded yet)" : protocols);
         section(sb, "VENDOR SERVICE SURFACE", surfaceText);
+        section(sb, "EXPORTED ACTIVITIES (launchable from the Launch activities screen)",
+                targetsText.isEmpty() ? "(not read yet)" : targetsText);
         section(sb, "SNIFFED BROADCASTS (" + sniffActions.size() + " actions watched)",
                 sniff.joined() + "\nwatching:\n  " + joinLines(sniffActions).replace("\n", "\n  "));
         section(sb, "VEHICLE SOURCES", sourcesText());
@@ -532,7 +645,15 @@ public class DiagnosticsActivity extends Activity {
         section(sb, "KEY EVENTS", keys.joined());
         section(sb, "WIRELESS ANDROID AUTO", aaText);
         section(sb, "SERIAL PORTS", serialText);
-        return sb.toString();
+        if (deviceSections.isEmpty()) {
+            section(sb, "DEVICE CAPABILITIES", "(not read yet)");
+        } else {
+            for (java.util.Map.Entry<String, String> e : deviceSections.entrySet()) {
+                section(sb, e.getKey(), e.getValue());
+            }
+        }
+        // Exports get posted publicly: hide device-specific MAC halves and serials.
+        return ExportText.maskText(sb.toString());
     }
 
     private void copyReport() {
