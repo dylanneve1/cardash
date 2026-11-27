@@ -25,6 +25,7 @@ import ie.claudius.cardash.dash.Trip;
 import ie.claudius.cardash.layout.HomeLayout.Item;
 import ie.claudius.cardash.layout.Kind;
 import ie.claudius.cardash.media.NowPlaying;
+import ie.claudius.cardash.vehicle.Readiness;
 import ie.claudius.cardash.vehicle.VehicleField;
 import ie.claudius.cardash.vehicle.VehicleState;
 
@@ -492,6 +493,7 @@ final class Widgets {
                 m3.error(), m3.onErrorContainer());
         configure(v, field, gauge, it.getInt("min", field.min), it.getInt("max", field.max),
                 it.getInt("warn", field.warn), it.get("warndir", field.warnDir));
+        if (field.type == VehicleField.Type.STATUS) monitorsOnTap(v);
         add(new Live(VEH) {
             @Override void refresh() { feed(v, field, true); }
         }).refresh();
@@ -514,6 +516,12 @@ final class Widgets {
     private boolean feed(ValueView v, VehicleField field, boolean intakeStandsIn) {
         VehicleState s = lastVehicle;
         boolean miles = Prefs.mph(ctx);
+        if (field.section == VehicleField.Section.LAMBDA) v.setLabel(field.label(s, miles));
+        if (field.type == VehicleField.Type.STATUS && s != null && s.readiness != null) {
+            Readiness r = s.readiness;
+            v.setStatus(r.mil ? 1f : 0f, r.headline(), r.light());
+            return true;
+        }
         Float val = field.value(s);
         String note = s != null && "fuel".equals(field.id) && s.fuelUnsupported
                 ? ctx.getString(R.string.unavailable) : null;
@@ -534,25 +542,20 @@ final class Widgets {
 
     /**
      * Several values as pills in one card: the car page's fuel, outside
-     * temperature, battery and trip, or everything the engine reports.
-     * Fuel and outside temperature are always there; the rest appear
-     * once the car has given a value.
+     * temperature, battery and trip, or everything the engine reports
+     * ({@link #engineList}). Fuel and outside temperature are always
+     * there; the rest appear once the car has given a value.
      */
     private View list(Item it) {
-        final boolean engine = Kind.LIST_ENGINE.equals(it.get("set", Kind.LIST_CAR));
-        final ValueList card = new ValueList(ctx, m3, engine,
-                ctx.getString(R.string.engine_data), ctx.getString(R.string.engine_waiting));
+        if (Kind.LIST_ENGINE.equals(it.get("set", Kind.LIST_CAR))) return engineList();
+        final ValueList card = new ValueList(ctx, m3, ctx.getString(R.string.engine_waiting));
         final List<VehicleField> fields = new ArrayList<>();
         final List<ValueView> pills = new ArrayList<>();
-        if (engine) {
-            fields.addAll(VehicleField.all());
-        } else {
-            for (String id : new String[] { "fuel", "outside", "voltage" }) fields.add(VehicleField.of(id));
-        }
+        for (String id : new String[] { "fuel", "outside", "voltage" }) fields.add(VehicleField.of(id));
         for (VehicleField f : fields) {
             ValueView v = pill(m3.surfaceContainerHigh());
             configure(v, f, false, f.min, f.max, f.warn, f.warnDir);
-            if (engine || "voltage".equals(f.id)) v.setVisibility(View.GONE);
+            if ("voltage".equals(f.id)) v.setVisibility(View.GONE);
             pills.add(v);
             card.add(v);
         }
@@ -560,26 +563,81 @@ final class Widgets {
             @Override void refresh() {
                 for (int i = 0; i < pills.size(); i++) {
                     VehicleField f = fields.get(i);
-                    // The engine list has the intake air in its own row.
-                    boolean known = feed(pills.get(i), f, !engine);
-                    if (engine || "voltage".equals(f.id)) card.show(pills.get(i), known);
+                    boolean known = feed(pills.get(i), f, true);
+                    if ("voltage".equals(f.id)) card.show(pills.get(i), known);
                 }
             }
         }).refresh();
-        if (!engine) {
-            ValueView t = pill(m3.surfaceContainerHigh());
-            card.add(t);
-            tripPill(t);
-            t.setOnLongClickListener(new View.OnLongClickListener() {
-                @Override
-                public boolean onLongClick(View view) {
-                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-                    host.enterEdit();
-                    return true;
-                }
-            });
-        }
+        ValueView t = pill(m3.surfaceContainerHigh());
+        card.add(t);
+        tripPill(t);
+        t.setOnLongClickListener(editOnHold());
         return card;
+    }
+
+    /** Every value the car has given, in sections, with the fault-code button. */
+    private View engineList() {
+        final SectionList card = new SectionList(ctx, m3, ctx.getString(R.string.engine_data),
+                ctx.getString(R.string.engine_waiting), ctx.getString(R.string.codes_read), new Runnable() {
+                    @Override public void run() { FaultCodes.show(ctx, m3); }
+                });
+        card.onHold(editOnHold());
+        final List<VehicleField> fields = VehicleField.all();
+        final List<ValueView> pills = new ArrayList<>();
+        for (VehicleField f : fields) {
+            ValueView v = pill(m3.surfaceContainerHigh());
+            configure(v, f, false, f.min, f.max, f.warn, f.warnDir);
+            v.setVisibility(View.GONE);
+            if (f.type == VehicleField.Type.STATUS) {
+                monitorsOnTap(v);
+                v.setOnLongClickListener(editOnHold());
+            }
+            pills.add(v);
+            card.add(f.section, v);
+        }
+        add(new Live(VEH) {
+            @Override void refresh() {
+                // The list has the intake air in its own row, so it never stands in for outside air.
+                for (int i = 0; i < pills.size(); i++) {
+                    card.show(pills.get(i), feed(pills.get(i), fields.get(i), false));
+                }
+            }
+        }).refresh();
+        return card;
+    }
+
+    private View.OnLongClickListener editOnHold() {
+        return new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View view) {
+                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                host.enterEdit();
+                return true;
+            }
+        };
+    }
+
+    /** Tapping the emissions readiness lists the self-tests one by one. */
+    private void monitorsOnTap(View v) {
+        v.setClickable(true);
+        Shapes.springy(v);
+        v.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Readiness r = lastVehicle == null ? null : lastVehicle.readiness;
+                if (r == null) return;
+                Pop pop = new Pop(ctx, m3, ctx.getString(R.string.readiness_title));
+                pop.note(r.light());
+                for (Readiness.Monitor m : r.monitors) {
+                    pop.note(m.name + ": " + ctx.getString(m.complete ? R.string.monitor_complete
+                            : R.string.monitor_incomplete));
+                }
+                pop.row(ctx.getString(R.string.codes_read), new Runnable() {
+                    @Override public void run() { FaultCodes.show(ctx, m3); }
+                });
+                pop.button(ctx.getString(android.R.string.ok), null, true).show();
+            }
+        });
     }
 
     private View car() {
@@ -614,7 +672,7 @@ final class Widgets {
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
         scroll.setFillViewport(true);
         // An open door comes first: it must not be the chip that scrolls out of sight.
-        final TextView doors = chip(bar), fuel = chip(bar), coolant = chip(bar), rpm = chip(bar), sample = chip(bar);
+        final TextView doors = chip(bar), engine = chip(bar), fuel = chip(bar), coolant = chip(bar), rpm = chip(bar), sample = chip(bar);
         add(new Live(VEH) {
             @Override void refresh() {
                 VehicleState s = lastVehicle;
@@ -630,7 +688,10 @@ final class Widgets {
                 int open = s.openDoors();
                 show(doors, open > 0 ? (open == 1 ? "Door open" : open + " doors open") : null,
                         m3.primaryContainer(), m3.onPrimaryContainer());
-                boolean empty = fuel.getVisibility() != View.VISIBLE && coolant.getVisibility() != View.VISIBLE
+                boolean light = s.readiness != null && s.readiness.mil;
+                show(engine, light ? ctx.getString(R.string.check_engine) : null,
+                        m3.errorContainer(), m3.onErrorContainer());
+                boolean empty = !light && fuel.getVisibility() != View.VISIBLE && coolant.getVisibility() != View.VISIBLE
                         && rpm.getVisibility() != View.VISIBLE && doors.getVisibility() != View.VISIBLE;
                 show(sample, editing && empty ? "Vehicle strip" : null,
                         m3.surfaceContainerHigh(), m3.onSurfaceVariant());

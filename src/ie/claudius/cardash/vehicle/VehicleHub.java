@@ -151,6 +151,17 @@ public final class VehicleHub {
         return false;
     }
 
+    /** Read the stored fault codes from whichever running source can; answered on the main thread. */
+    public void readCodes(DtcReader.Listener listener) {
+        for (Entry e : entries) {
+            if (e.started && e.source instanceof DtcReader) {
+                ((DtcReader) e.source).readCodes(listener);
+                return;
+            }
+        }
+        listener.onCodes(null, "no OBD adapter is in use");
+    }
+
     public List<Entry> entries() {
         return entries;
     }

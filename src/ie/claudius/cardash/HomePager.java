@@ -125,7 +125,8 @@ final class HomePager extends FrameLayout {
                     begin(1, e);
                     return true;
                 }
-                if (-dy > slop && Math.abs(dy) > Math.abs(dx) * 1.3f) {
+                // ...unless the finger is on a list that scrolls: the swipe is the list's.
+                if (-dy > slop && Math.abs(dy) > Math.abs(dx) * 1.3f && !ScrollArea.under(this, downX, downY)) {
                     begin(2, e);
                     return true;
                 }

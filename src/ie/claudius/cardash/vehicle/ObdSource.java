@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import ie.claudius.cardash.Prefs;
 import ie.claudius.cardash.bt.BtDevices;
@@ -51,11 +52,15 @@ import ie.claudius.cardash.car.Vin;
  * cycle; coolant, fuel level and outside (or intake) air now and then;
  * and, only where the car's bitmaps list them, the rest of the engine
  * data (load, trims, pressures, voltage, oil temperature and so on) in
- * whatever room is left.
+ * whatever room is left. The long tail (monitor status, O2 sensors, EGR,
+ * exhaust temperatures and so on) takes turns, a little at a time.
+ *
+ * Stored fault codes (mode 03) are read between two cycles when asked.
+ * Nothing is ever written to the car: codes are not cleared.
  *
  * Engine OBD has no inside temperature.
  */
-public final class ObdSource implements VehicleSource {
+public final class ObdSource implements VehicleSource, DtcReader {
 
     private static final String TAG = "CarDash/OBD";
     /** Standard Bluetooth SPP UUID — every ELM327 clone uses it. */
@@ -70,6 +75,10 @@ public final class ObdSource implements VehicleSource {
     /** The first request makes the adapter search every protocol. */
     private static final long SEARCH_MS = 12_000L;
     private static final int MULTI_FAILS = 3;
+    private static final long CODES_MS = 6000L;
+    /** The car counts as answering if it gave data this recently. */
+    private static final long RECENT_MS = 5000L;
+    private static final int MONITOR_STATUS = 0x01;
 
     /** Snapshot for the Diagnostics screen. */
     public static final class Diag {
@@ -104,6 +113,8 @@ public final class ObdSource implements VehicleSource {
     private volatile ObdSchedule schedule;
     private final Map<Integer, Long> seen = new HashMap<>();
     private final Handler main = new Handler(Looper.getMainLooper());
+    /** Someone waiting for the fault codes; the poll thread answers. */
+    private final AtomicReference<DtcReader.Listener> codesWanted = new AtomicReference<>();
 
     @Override
     public String name() {
@@ -218,7 +229,54 @@ public final class ObdSource implements VehicleSource {
         worker = null;
         closeQuietly();
         socketState = "stopped";
+        answerCodes(codesWanted.getAndSet(null), null, "stopped before the codes were read");
         if (w != null) w.interrupt();
+    }
+
+    @Override
+    public void readCodes(DtcReader.Listener l) {
+        if (!running || schedule == null) {
+            answerCodes(l, null, "not talking to the car (" + socketState + ")");
+            return;
+        }
+        // One reader at a time: whoever asked before is told so.
+        answerCodes(codesWanted.getAndSet(l), null, "asked again");
+    }
+
+    private void answerCodes(final DtcReader.Listener l, final List<String> codes, final String error) {
+        if (l == null) return;
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                l.onCodes(codes, error);
+            }
+        });
+    }
+
+    /**
+     * Mode 03, with the adapter given longer to wait than the poll's short
+     * timeout. Only of a car that is answering: silence from one with the
+     * ignition off must not read as "no codes".
+     */
+    private void serveCodes(OutputStream out, InputStream in) throws Exception {
+        DtcReader.Listener l = codesWanted.getAndSet(null);
+        if (l == null) return;
+        if (System.currentTimeMillis() - state.obdReplyMillis > RECENT_MS) {
+            answerCodes(l, null, "the car is not answering (ignition off?)");
+            return;
+        }
+        boolean answered = false;
+        try {
+            ask(out, in, "ATAT1", REPLY_MS);
+            ask(out, in, "ATSTFF", REPLY_MS);
+            List<String> codes = Dtc.parse(ask(out, in, Dtc.COMMAND, CODES_MS), ObdReply.isCan(protocol));
+            ask(out, in, "ATAT2", REPLY_MS);
+            ask(out, in, "ATST19", REPLY_MS);
+            answerCodes(l, codes, codes == null ? "the car sent no readable answer" : null);
+            answered = true;
+        } finally {
+            if (!answered) answerCodes(l, null, "the link failed while reading");
+        }
     }
 
     /** True while the calling thread is the live poller (a stopped one must not touch the new one's socket). */
@@ -240,6 +298,8 @@ public final class ObdSource implements VehicleSource {
                 socketState = "poll failed: " + e.getMessage();
                 clearValues();
                 state.obdLinked = false;
+                schedule = null;
+                answerCodes(codesWanted.getAndSet(null), null, "the link to the adapter was lost");
                 publish(listener);
                 closeQuietly();
                 sleep(3000);
@@ -306,6 +366,7 @@ public final class ObdSource implements VehicleSource {
                     socketState = link + "; the car is not answering (ignition off?)";
                     clearValues();
                     publish(listener);
+                    answerCodes(codesWanted.getAndSet(null), null, "the car is not answering (ignition off?)");
                     sleep(quiet(lastData) ? QUIET_POLL_MS : 2000);
                     continue;
                 }
@@ -336,6 +397,7 @@ public final class ObdSource implements VehicleSource {
             }
             expire(now);
             publish(listener);
+            serveCodes(out, in);
             if (!any) sleep(quiet(lastData) ? QUIET_POLL_MS : IDLE_MS);
         }
     }
@@ -383,16 +445,28 @@ public final class ObdSource implements VehicleSource {
 
     private void apply(int pid, int[] b, long now) {
         seen.put(pid, now);
-        int v = Math.round(VehicleField.decode(pid, b));
         switch (pid) {
-            case ObdSchedule.RPM: state.rpm = ((b[0] * 256) + b[1]) / 4; break;
-            case ObdSchedule.SPEED: state.speedKph = v; break;
-            case ObdSchedule.COOLANT: state.coolantC = v; break;
-            case ObdSchedule.FUEL: state.fuelPercent = v; break;
-            case ObdSchedule.AMBIENT: state.outsideC = v; break;
-            case ObdSchedule.INTAKE: state.intakeC = v; break;
-            default: state.engine.put(pid, VehicleField.decode(pid, b)); break;
+            case ObdSchedule.RPM: state.rpm = ((b[0] * 256) + b[1]) / 4; return;
+            case ObdSchedule.SPEED: state.speedKph = whole(pid, b); return;
+            case ObdSchedule.COOLANT: state.coolantC = whole(pid, b); return;
+            case ObdSchedule.FUEL: state.fuelPercent = whole(pid, b); return;
+            case ObdSchedule.AMBIENT: state.outsideC = whole(pid, b); return;
+            case ObdSchedule.INTAKE: state.intakeC = whole(pid, b); return;
+            case VehicleField.O2_PRESENT_2_BANKS: state.o2Sensors2Banks = b[0]; return;
+            case VehicleField.O2_PRESENT_4_BANKS: state.o2Sensors4Banks = b[0]; return;
+            case MONITOR_STATUS: state.readiness = Readiness.parse(b); return;
+            default: break;
         }
+        for (VehicleField f : VehicleField.all()) {
+            if (f.pid != pid) continue;
+            Float v = f.read(b);
+            if (v == null) state.engine.remove(f.key());
+            else state.engine.put(f.key(), v);
+        }
+    }
+
+    private static int whole(int pid, int[] b) {
+        return Math.round(VehicleField.decode(pid, b));
     }
 
     /** One missed reply keeps the last value; several in a row make it unknown again. */
@@ -411,14 +485,18 @@ public final class ObdSource implements VehicleSource {
 
     private void clear(int pid) {
         switch (pid) {
-            case ObdSchedule.RPM: state.rpm = VehicleState.UNKNOWN_INT; break;
-            case ObdSchedule.SPEED: state.speedKph = VehicleState.UNKNOWN_INT; break;
-            case ObdSchedule.COOLANT: state.coolantC = VehicleState.UNKNOWN_INT; break;
-            case ObdSchedule.FUEL: state.fuelPercent = VehicleState.UNKNOWN_INT; break;
-            case ObdSchedule.AMBIENT: state.outsideC = VehicleState.UNKNOWN_INT; break;
-            case ObdSchedule.INTAKE: state.intakeC = VehicleState.UNKNOWN_INT; break;
-            default: state.engine.remove(pid); break;
+            case ObdSchedule.RPM: state.rpm = VehicleState.UNKNOWN_INT; return;
+            case ObdSchedule.SPEED: state.speedKph = VehicleState.UNKNOWN_INT; return;
+            case ObdSchedule.COOLANT: state.coolantC = VehicleState.UNKNOWN_INT; return;
+            case ObdSchedule.FUEL: state.fuelPercent = VehicleState.UNKNOWN_INT; return;
+            case ObdSchedule.AMBIENT: state.outsideC = VehicleState.UNKNOWN_INT; return;
+            case ObdSchedule.INTAKE: state.intakeC = VehicleState.UNKNOWN_INT; return;
+            case VehicleField.O2_PRESENT_2_BANKS: state.o2Sensors2Banks = VehicleState.UNKNOWN_INT; return;
+            case VehicleField.O2_PRESENT_4_BANKS: state.o2Sensors4Banks = VehicleState.UNKNOWN_INT; return;
+            case MONITOR_STATUS: state.readiness = null; return;
+            default: break;
         }
+        for (VehicleField f : VehicleField.all()) if (f.pid == pid) state.engine.remove(f.key());
     }
 
     private void clearValues() {

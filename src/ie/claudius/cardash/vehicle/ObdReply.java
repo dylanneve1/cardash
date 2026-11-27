@@ -21,8 +21,8 @@ public final class ObdReply {
     /** Data bytes a mode-01 PID returns, for the PIDs CarDash asks; -1 for any other. */
     public static int length(int pid) {
         if (pid == 0x00 || pid == 0x20 || pid == 0x40 || pid == 0x60) return 4;
-        VehicleField f = VehicleField.byPid(pid);
-        return f == null ? -1 : f.bytes;
+        VehicleField.Request r = VehicleField.request(pid);
+        return r == null ? -1 : r.bytes;
     }
 
     /** The request for up to six mode-01 PIDs, e.g. "010C0D05". */

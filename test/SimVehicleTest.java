@@ -60,7 +60,9 @@ public class SimVehicleTest {
         v = s.state(0);
         for (VehicleField f : VehicleField.all()) {
             Float x = f.value(v);
-            check(x != null && x >= f.min && x <= f.max, "idle " + f.id + " = " + x);
+            // A petrol car: nothing from an exhaust temperature or particulate filter sensor.
+            if (f.id.startsWith("egt") || f.id.startsWith("dpf")) check(x == null, "diesel only: " + f.id);
+            else check(x != null && x >= f.min && x <= f.max, "idle " + f.id + " = " + x);
         }
         float idleMaf = v.engine.get(0x10);
         check(v.engine.get(0x42) > 13.5f && idleMaf > 1 && idleMaf < 10, "idle volts and air " + idleMaf);
@@ -87,6 +89,21 @@ public class SimVehicleTest {
         check(low == 0 && high > 60 && s.state(20_000).engine.get(0x42) > 13, "the drive moves the engine data " + high);
         s.apply(SimVehicle.pairs("reset=1"), 0);
         check(s.state(0).engine.containsKey(0x5C), "reset brings them back");
+
+        // Monitor status and fault codes follow the check-engine switch.
+        v = s.state(0);
+        check(!v.readiness.mil && v.readiness.codes == 0 && v.readiness.incomplete() == 1 && !v.readiness.diesel
+                && s.codes().isEmpty(), "no light by default");
+        check(s.apply(SimVehicle.pairs("mil=1"), 0).isEmpty(), "light switched on");
+        v = s.state(0);
+        check(v.readiness.mil && v.readiness.codes == s.codes().size() && s.codes().size() == 2
+                && v.engine.get(0x21) > 0, "light, codes and distance");
+        check(!s.apply(SimVehicle.pairs("readiness=1"), 0).isEmpty(), "readiness is not set by hand");
+        check(s.apply(SimVehicle.pairs("egt11=640,dpfin1=300,o2v1=0.2,mil=na"), 0).isEmpty(), "diesel values settable");
+        v = s.state(0);
+        check(VehicleField.of("egt11").value(v) == 640f && VehicleField.of("dpfin1").value(v) == 300f
+                && VehicleField.of("egt12").value(v) == null && VehicleField.of("o2v1").value(v) == 0.2f
+                && v.readiness == null, "set values, and no monitor status");
 
         if (failures > 0) {
             System.out.println(failures + " failures");

@@ -23,6 +23,15 @@ public class VehicleFieldTest {
         check(VehicleField.byPid(pid).bytes == bytes.length, String.format("PID %02X byte count", pid));
     }
 
+    /** A field's reading of its PID's bytes; null for none. */
+    private static void reads(String id, Float want, int... bytes) {
+        VehicleField f = VehicleField.of(id);
+        Float got = f.read(bytes);
+        check(bytes.length == f.bytes, id + " byte count");
+        check(want == null ? got == null : got != null && Math.abs(got - want) < 0.01f,
+                id + ": want " + want + ", got " + got);
+    }
+
     public static void main(String[] args) {
         decodes(0x04, 50.196f, 0x80);
         decodes(0x05, 83, 123);
@@ -52,16 +61,87 @@ public class VehicleFieldTest {
         decodes(0x5C, 90, 130);
         decodes(0x5E, 6.4f, 0, 128);
 
+        decodes(0x08, 50, 192);
+        decodes(0x09, -50, 64);
+        decodes(0x22, 79, 0x03, 0xE8);          // 1000 * 0.079
+        decodes(0x2C, 100, 255);
+        decodes(0x2D, -100, 0);
+        decodes(0x2D, 0, 128);
+        decodes(0x2E, 20, 51);
+        decodes(0x32, -1, 0xFF, 0xFC);          // two's complement, quarter pascals
+        decodes(0x32, 1000, 0x0F, 0xA0);
+        decodes(0x45, 20, 51);
+        decodes(0x4A, 100, 255);
+        decodes(0x4B, 0, 0);
+        decodes(0x4D, 258, 1, 2);
+        decodes(0x4E, 1000, 0x03, 0xE8);
+        // Narrowband O2: volts and trim; FF means the sensor takes no part in the trim.
+        reads("o2v1", 0.45f, 90, 128);
+        reads("o2t1", 0f, 90, 128);
+        reads("o2t2", -50f, 90, 64);
+        reads("o2t2", null, 90, 0xFF);
+        reads("o2v8", 1.275f, 255, 0xFF);
+        // Wideband: lambda and volts, or lambda and current.
+        reads("wbr1", 1.0f, 0x80, 0x00, 0x20, 0x00);
+        reads("wbv1", 1.0f, 0x80, 0x00, 0x20, 0x00);
+        reads("wcr3", 1.0f, 0x80, 0x00, 0x80, 0x00);
+        reads("wci3", 0f, 0x80, 0x00, 0x80, 0x00);
+        reads("wci3", -128f, 0x80, 0x00, 0x00, 0x00);
+        reads("wci3", 1.5f, 0x80, 0x00, 0x81, 0x80);
+        // Exhaust temperatures: byte A says which sensors are there.
+        int[] egt = { 0x05, 0x10, 0x00, 0, 0, 0x17, 0x70, 0, 0 };
+        reads("egt11", 369.6f, egt);
+        reads("egt12", null, egt);
+        reads("egt13", 560f, egt);
+        reads("egt14", null, egt);
+        reads("egt21", 369.6f, egt);
+        int[] dpf = { 0x02, 0, 0, 0x0F, 0xA0, 0, 0, 0, 0 };
+        reads("dpfin1", null, dpf);
+        reads("dpfout1", 360f, dpf);
+        reads("readiness", 1f, 0x81, 0x07, 0, 0);
+        reads("readiness", 0f, 0, 0x07, 0, 0);
+        check(VehicleField.of("egt11").pid == 0x78 && VehicleField.of("egt24").pid == 0x79
+                && VehicleField.of("wbr1").pid == 0x24 && VehicleField.of("wcr8").pid == 0x3B
+                && VehicleField.of("o2v5").pid == 0x18, "PIDs of the many");
+        check(VehicleField.of("egt11").read(new int[] { 1, 2 }) == null, "a short reply is nothing");
+        for (int pid : new int[] { 1, 8, 9, 0x13, 0x1D, 0x14, 0x1B, 0x22, 0x24, 0x2B, 0x2C, 0x2D, 0x2E, 0x32, 0x34,
+                0x3B, 0x45, 0x4A, 0x4B, 0x4D, 0x4E, 0x78, 0x79, 0x7C }) {
+            check(VehicleField.request(pid) != null, String.format("PID %02X is asked", pid));
+        }
+
         Set<String> ids = new HashSet<>();
         Set<Integer> pids = new HashSet<>();
         for (VehicleField f : VehicleField.all()) {
-            check(ids.add(f.id) && pids.add(f.pid), "unique " + f.id);
-            check(VehicleField.of(f.id) == f && VehicleField.byPid(f.pid) == f, "lookup " + f.id);
-            check(f.bytes >= 1 && f.bytes <= 2 && f.min < f.max && !f.label.isEmpty(), "sane " + f.id);
+            check(ids.add(f.id) && pids.add(f.key()), "unique " + f.id);
+            check(VehicleField.of(f.id) == f && VehicleField.byPid(f.pid).pid == f.pid
+                    && VehicleField.request(f.pid).bytes == f.bytes, "lookup " + f.id);
+            check(f.bytes >= 1 && f.bytes <= 9 && f.min < f.max && !f.label.isEmpty(), "sane " + f.id);
             check(f.interval > 0 || "rpm".equals(f.id) || "speed".equals(f.id), "interval " + f.id);
             check(f.value(new VehicleState()) == null && f.value(null) == null, "unknown stays unknown: " + f.id);
         }
         check(VehicleField.of("warp") == null && VehicleField.byPid(0x00) == null, "no such field");
+        // The list runs section by section, as the engine data page shows it.
+        int section = 0;
+        for (VehicleField f : VehicleField.all()) {
+            check(f.section.ordinal() >= section, "in section order: " + f.id);
+            section = f.section.ordinal();
+        }
+        // Sensor names follow the bitmap the car answers.
+        VehicleState banks = new VehicleState();
+        VehicleField third = VehicleField.of("o2v3"), fifth = VehicleField.of("wbr5");
+        check("O2 B1S3".equals(third.label(banks, false)) && "Lambda B2S1".equals(fifth.label(banks, false)),
+                "two banks unless told otherwise");
+        banks.o2Sensors4Banks = 0x0F;
+        check("O2 B2S1".equals(third.label(banks, false)) && "Lambda B3S1".equals(fifth.label(banks, false))
+                && "O2 B2S1 trim".equals(VehicleField.of("o2t3").label(banks, false))
+                && "Lambda B4S2 current".equals(VehicleField.of("wci8").label(banks, false))
+                && "Battery".equals(VehicleField.of("voltage").label(banks, false)), "four banks");
+        banks.o2Sensors2Banks = 0x03;
+        check("O2 B1S3".equals(third.label(banks, false)), "PID 13 wins");
+        Set<String> picks = new HashSet<>();
+        for (VehicleField f : VehicleField.all()) check(picks.add(f.pickName()), "pick names differ: " + f.pickName());
+        VehicleField mins = VehicleField.of("miltime");
+        check("45 min".equals(mins.format(45)) && "2 h 05".equals(mins.format(125)), "minutes");
 
         VehicleState s = new VehicleState();
         s.coolantC = 90;
@@ -76,6 +156,11 @@ public class VehicleFieldTest {
         other.engine.put(0x04, 30f);
         VehicleState merged = VehicleMerge.merge(copy, null, other);
         check(merged.engine.get(0x42) == 13.8f && merged.engine.get(0x04) == 30f, "merged by priority");
+        other.readiness = ie.claudius.cardash.vehicle.Readiness.parse(new int[] { 0x80, 0, 0, 0 });
+        other.o2Sensors2Banks = 3;
+        merged = VehicleMerge.merge(copy, other);
+        check(merged.readiness != null && merged.copy().readiness.mil && merged.o2Sensors2Banks == 3
+                && VehicleField.of("readiness").value(merged) == 1f && merged.hasAnything(), "readiness merged");
 
         VehicleField temp = VehicleField.of("coolant"), speed = VehicleField.of("speed"),
                 mil = VehicleField.of("mildist"), volts = VehicleField.of("voltage"),

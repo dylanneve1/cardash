@@ -119,6 +119,9 @@ public final class Prefs {
         return "on".equals(get(ctx, SIM, "off"));
     }
 
+    /** Set once the "Add car pages?" offer has been answered; it is not made again. */
+    public static final String CAR_PAGES_OFFER = "car_pages_offer";   // unset | added | declined
+
     /** The mode the vehicle hub should run in. */
     public static String sourceMode(Context ctx) {
         return simulating(ctx) ? VehicleHub.MODE_SIM : vehicleMode(ctx);
