@@ -57,8 +57,7 @@ public final class ObdReply {
                 if (multi == null) continue;
                 for (int b : bytes(line.substring(2))) multi.write(b);
             } else if (line.length() >= 4 && (line.length() & 1) == 0 && isHex(line)) {
-                flush(out, multi, want);
-                multi = null;
+                // A single-frame message; another ECU's may arrive between the frames of a long one.
                 out.add(bytes(line));
             }
         }

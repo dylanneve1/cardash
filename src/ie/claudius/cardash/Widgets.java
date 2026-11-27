@@ -564,8 +564,8 @@ final class Widgets {
         scroll.addView(bar, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
         scroll.setFillViewport(true);
-        final TextView fuel = chip(bar), coolant = chip(bar), rpm = chip(bar), outside = chip(bar), doors = chip(bar),
-                sample = chip(bar);
+        // An open door comes first: it must not be the chip that scrolls out of sight.
+        final TextView doors = chip(bar), fuel = chip(bar), coolant = chip(bar), rpm = chip(bar), sample = chip(bar);
         add(new Live(VEH) {
             @Override void refresh() {
                 VehicleState s = lastVehicle;
@@ -578,14 +578,11 @@ final class Widgets {
                         m3.surfaceContainerHigh(), m3.onSurface());
                 show(rpm, s.rpm != VehicleState.UNKNOWN_INT && s.rpm > 0 ? s.rpm + " rpm" : null,
                         m3.surfaceContainerHigh(), m3.onSurface());
-                show(outside, s.outsideC != VehicleState.UNKNOWN_INT ? "Outside " + temperature(s.outsideC) : null,
-                        m3.surfaceContainerHigh(), m3.onSurface());
                 int open = s.openDoors();
                 show(doors, open > 0 ? (open == 1 ? "Door open" : open + " doors open") : null,
                         m3.primaryContainer(), m3.onPrimaryContainer());
                 boolean empty = fuel.getVisibility() != View.VISIBLE && coolant.getVisibility() != View.VISIBLE
-                        && rpm.getVisibility() != View.VISIBLE && outside.getVisibility() != View.VISIBLE
-                        && doors.getVisibility() != View.VISIBLE;
+                        && rpm.getVisibility() != View.VISIBLE && doors.getVisibility() != View.VISIBLE;
                 show(sample, editing && empty ? "Vehicle strip" : null,
                         m3.surfaceContainerHigh(), m3.onSurfaceVariant());
             }

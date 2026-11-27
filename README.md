@@ -25,7 +25,7 @@ Aftermarket head units ship with launchers that look like 2012 and behave worse.
 - **Material You, generated on-device.** The whole palette is derived from your wallpaper — or from one of six bundled designs — so the clock, the gauge, the tiles and the controls all belong to one scheme. Works on Android 11, which never had dynamic colour.
 - **A dash column that's yours.** A GPS speedometer, a trip meter, and the weather. Show the ones you want, or none and let the app grid take the room.
 - **Now playing, without leaning over.** Whatever's playing — Bluetooth, Spotify, the radio app — appears under the clock with transport controls sized for a moving car.
-- **Car data when there's a source.** Fuel, coolant, RPM and open doors from an ELM327 dongle or the unit's own CAN box. Nothing is shown until something real reports.
+- **Car data when there's a source.** Fuel, coolant, RPM, temperatures and open doors from an ELM327 dongle or the unit's own CAN box. Nothing is shown until something real reports.
 - **Expressive motion, or none.** Springs, staggers and crossfades tuned to Material 3's curves — or a *Calm* mode that swaps every one of them for a short fade.
 - **Dark only.** A bright screen reflected in a windscreen at night is a hazard, not a preference.
 
@@ -91,15 +91,37 @@ Built for a Jancar / Rockchip RK3326 unit — Android 11, 32-bit — and kept ho
 | Data source | Hardware | Gives you |
 |---|---|---|
 | GPS | The unit's own receiver | Speed, trip distance, position for weather |
-| `ObdSource` | ELM327 Bluetooth dongle | RPM, speed, coolant, fuel level |
+| `ObdSource` | ELM327 Bluetooth dongle | RPM, speed, coolant; fuel level and outside (or intake) air temperature where the car has the PID; VIN |
 | `JancarSource` | CAN box on the harness | Doors, boot, handbrake, reverse, fuel |
+| `HcnSource` | HCN head units (`com.hcn.autocan`) | Doors, handbrake, fuel, outside temperature, odometer (see [docs/hcn.md](docs/hcn.md)) |
 | `HcnSource` | HCN head units (`com.hcn.autocan`), Raise box | Doors, boot; handbrake, RPM, fuel if the vendor service passes frames on ([docs/hcn.md](docs/hcn.md)) — untested on a car |
 
-OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where both report a field, the CAN box wins. When OBD reports speed, the gauge prefers it over GPS (no lag under braking, no tunnel dropout). Fuel is remembered across restarts; doors are not.
+OBD-II has no PID for door state — that lives on the body bus — so doors need the CAN box. Where several sources report a field, the OBD dongle wins and the CAN box fills in what it lacks (fuel, for instance). When OBD reports speed, the gauge prefers it over GPS (no lag under braking, no tunnel dropout). Fuel is remembered across restarts; doors are not. A value nobody reports shows a dash, or *Unavailable* when the car says it has no such PID; engine OBD has no inside temperature at all.
 
-## Bluetooth and the OBD dongle
+The OBD link is tuned for speed: supported PIDs are read once, on CAN several PIDs share one request, RPM and speed go in every cycle and slow values now and then. *Diagnostics* shows the measured requests per second.
 
-*Settings → Bluetooth / OBD dongle* (or *Diagnostics → OBD-II*) pairs a dongle without leaving CarDash. **Scan** runs classic discovery, then a 10 s Bluetooth LE scan; likely dongles are marked and listed first. Tap one to pair (most ELM327s use PIN 1234 or 0000), then **Use as OBD dongle**: CarDash connects to that address whatever it is called. With none chosen it matches paired devices by name. Only classic (SPP) dongles can be read; BLE-only ones are labelled. Searching needs the location permission and location switched on.
+## Car pages
+
+A fresh install has three pages: **car information** (RPM, speed, coolant, fuel, outside temperature round a top-down car whose doors swing open), the **home** page where it starts, and **useful information** (clock, now playing, weather, trip). Swipe up for apps. A layout you have saved is never replaced; *Edit → Default* gets the new one.
+
+- **Style** — the car page comes as *Modern* widgets or a monochrome *Classic VW* cluster screen (heading and time, car, outside temperature, odometer and trip). Choose per page in edit mode, or in Settings.
+- **Car profile** — make, model and body (3-door, 5-door, estate, saloon). Make and model come from the VIN; the door count doesn't, so pick it.
+- **Warnings** — a value's box turns red past its limit (5500 rpm, 110 °C coolant; each widget's gear changes it).
+- **Unplug reminder** — with a dongle chosen, three minutes without the engine running raises a notification and a banner, once per stop.
+
+### Trying it without a car
+
+*Diagnostics → Simulated vehicle* replaces every source with made-up data (marked on screen). Drive it from the Phone settings page (sliders, switches, a repeating drive cycle) or from adb:
+
+```sh
+P=content://ie.claudius.cardash.diag
+adb shell content call --uri $P --method sim --arg "enable=1,rpm=3000,door_fl=1"
+adb shell content call --uri $P --method sim --arg "cycle=1"        # play a drive; cycle=0 stops it
+adb shell content call --uri $P --method sim --arg "fuel=na"        # a value the car doesn't have
+adb shell content call --uri $P --method sim --arg "enable=0"
+```
+
+Names: `rpm speed coolant fuel outside odometer door_fl door_fr door_rl door_rr boot bonnet handbrake reverse` (and `reset=1`).
 
 ## Phone settings
 

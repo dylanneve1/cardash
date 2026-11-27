@@ -40,6 +40,10 @@ public class ObdReplyTest {
         check(m.size() == 6, "multi-frame size " + m.keySet());
         check(eq(m.get(0x05), 0x7B) && eq(m.get(0x2F), 0x80) && eq(m.get(0x46), 0x37)
                 && eq(m.get(0x0F), 0x41), "multi-frame values");
+        // Another ECU's short answer between the frames doesn't cut the long one off.
+        m = ObdReply.mode01("00F\r0:410C1AF80D32\r410D31\r1:057B2F8046370F\r2:41AAAAAAAAAAAA\r",
+                0x0C, 0x0D, 0x05, 0x2F, 0x46, 0x0F);
+        check(m.size() == 6 && eq(m.get(0x0F), 0x41), "interleaved ECUs " + m.keySet());
         // Padding past the declared length is never read.
         m = ObdReply.mode01("008\r0:410C1AF80D32\r1:057BAAAAAAAAAA\r", 0x0C, 0x0D, 0x05);
         check(m.size() == 3 && eq(m.get(0x05), 0x7B), "padding cut");

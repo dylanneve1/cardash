@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plain-JVM tests for the Android-free parts (ELM327 parsing, HCN/Raise frames, phone settings page, QR code, exported-activity launcher, clock fit, home layout model, Bluetooth device list).
+# Plain-JVM tests for the Android-free parts (ELM327 parsing, VIN and car profile, car drawing, unplug reminder, simulator, HCN/Raise frames, phone settings page, QR code, exported-activity launcher, clock fit, home layout model, Bluetooth device list).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/build/test"

@@ -140,6 +140,8 @@ public final class ValueView extends android.view.View {
             c.drawLine(cx + (float) Math.cos(a) * (rr - stroke * 0.75f), cy + (float) Math.sin(a) * (rr - stroke * 0.75f),
                     cx + (float) Math.cos(a) * (rr + stroke * 0.75f), cy + (float) Math.sin(a) * (rr + stroke * 0.75f), mark);
             big.setTextSize(s * 0.30f);
+            float room = (s - 2 * stroke) * 0.78f, wide = big.measureText(shown);
+            if (wide > room) big.setTextSize(s * 0.30f * room / wide);   // four digits stay inside the ring
             c.drawText(shown, cx, cy + s * 0.10f, big);
             small.setTextSize(Math.max(11 * d, s * 0.09f));
             c.drawText(known ? unit.trim() : note != null ? note : "", cx, cy + s * 0.27f, small);

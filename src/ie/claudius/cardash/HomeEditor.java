@@ -252,7 +252,15 @@ final class HomeEditor implements GridPage.Edit {
         pop.show();
     }
 
+    /** A classic cluster page shows no widgets, so nothing is added to it unseen. */
+    private boolean classicPage() {
+        if (!page().classic(Prefs.carTheme(act))) return false;
+        Toast.makeText(act, R.string.classic_edit_note, Toast.LENGTH_LONG).show();
+        return true;
+    }
+
     private void add(Entry e) {
+        if (classicPage()) return;
         if (Kind.APP.equals(e.kind)) {
             act.pickApp(null);   // the result adds the tile
             return;
